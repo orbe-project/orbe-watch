@@ -6,8 +6,8 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// Os shaders e a arte do orbe moram no orbe-qt e não são copiados para cá no
-// git: o build leva os .frag (o app converte de GLSL 440 para ES 3.00 ao
+// Os shaders e a arte do orbe moram no orbe-qt do orbe-desktop (o submódulo
+// orbe-desktop/) e não são copiados para cá no git: o build leva os .frag (o app converte de GLSL 440 para ES 3.00 ao
 // carregar) e os atlas para os assets. Mudou o desenho no desktop, mudou aqui.
 abstract class CopiarArte : DefaultTask() {
     @get:InputDirectory
@@ -41,7 +41,7 @@ abstract class CopiarArte : DefaultTask() {
 }
 
 val copiarArte = tasks.register<CopiarArte>("copiarArte") {
-    orbeQt.set(rootProject.layout.projectDirectory.dir("../orbe-qt"))
+    orbeQt.set(rootProject.layout.projectDirectory.dir("orbe-desktop/orbe-qt"))
     saida.set(layout.buildDirectory.dir("generated/orbe/assets"))
 }
 
@@ -83,7 +83,7 @@ android {
             all {
                 // os testes leem os .frag de verdade, do orbe-qt, e deixam os convertidos
                 // em build/shaders-es, para conferir num validador (glslangValidator)
-                it.systemProperty("orbe.qt", rootProject.layout.projectDirectory.dir("../orbe-qt").asFile.path)
+                it.systemProperty("orbe.qt", rootProject.layout.projectDirectory.dir("orbe-desktop/orbe-qt").asFile.path)
                 it.systemProperty("orbe.despejo", layout.buildDirectory.dir("shaders-es").get().asFile.path)
             }
         }

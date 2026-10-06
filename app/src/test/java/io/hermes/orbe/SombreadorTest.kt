@@ -10,7 +10,7 @@ import org.junit.Test
 
 /** A conversão é feita sobre os .frag de verdade, os do orbe-qt. */
 class SombreadorTest {
-    private val shaders = File(System.getProperty("orbe.qt") ?: "../../orbe-qt", "shaders")
+    private val shaders = File(System.getProperty("orbe.qt") ?: "../orbe-desktop/orbe-qt", "shaders")
 
     private fun ler(nome: String) = File(shaders, nome).readText()
 

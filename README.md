@@ -1,10 +1,10 @@
 # Orbe Watch
 
 <p align="center">
-<img src="img/ciclo.gif" width="288" alt="O orbe no relógio passando por em espera, ouvindo, pensando e falando">
+<img src="docs/img/ciclo.gif" width="288" alt="O orbe no relógio passando por em espera, ouvindo, pensando e falando">
 </p>
 
-O **Orbe Watch** é o [Orbe](../README.md) no pulso: o mesmo desenho, feito na
+O **Orbe Watch** é o [Orbe](https://github.com/bbarrosdavi/orbe-desktop) no pulso: o mesmo desenho, feito na
 GPU de um relógio Wear OS com os shaders do desktop, e um menu no estilo do
 aplicativo de configuração.
 
@@ -13,7 +13,7 @@ fala**: segurando o orbe, a sua voz vai para o agente (Claude Code, qualquer
 agente ACP, o Hermes), as linhas do raciocínio aparecem abaixo da figura e a
 resposta volta em voz. Quem pensa e responde é o agente.
 
-![O orbe em espera, ouvindo, pensando e falando](img/estados.png)
+![O orbe em espera, ouvindo, pensando e falando](docs/img/estados.png)
 
 ## Índice
 
@@ -91,11 +91,15 @@ A ponte pode ser servida de dois jeitos:
   `GEMINI_API_KEY` (voz) no ambiente, em `~/.hermes/.env` ou num arquivo
   passado com `--env`.
 - Para compilar o app: JDK 17 e o Android SDK (`ANDROID_HOME` ou
-  `orbe-wear/local.properties`). O Gradle é o do wrapper (9.3.1).
+  `local.properties`). O Gradle é o do wrapper (9.3.1).
 
 ## Começando
 
 São três passos: ligar a ponte, instalar o app e parear.
+
+A ponte e o orbe de pulso são do [orbe-desktop](https://github.com/bbarrosdavi/orbe-desktop):
+os comandos `./hermes_voice_*.py` e `./claude-orbe` deste documento rodam na
+pasta dele (o submódulo `orbe-desktop/` deste repositório serve).
 
 ### 1. Ligar a ponte
 
@@ -130,7 +134,8 @@ porta nenhuma.
 ### 2. Instalar o app
 
 ```sh
-cd orbe-wear
+git clone --recursive https://github.com/bbarrosdavi/orbe-watch.git
+cd orbe-watch
 ./gradlew :app:assembleRelease
 adb install app/build/outputs/apk/release/app-release.apk
 ```
@@ -250,7 +255,7 @@ cada aba é uma lista que rola sozinha. A gaveta é fixa: o orbe e os quatro
 botões cabem na tela sem rolar. O fundo fica parado atrás do orbe e do
 menu: ao arrastar de um para o outro só o conteúdo anda.
 
-![A gaveta e duas abas](img/ajustes-gaveta.png)
+![A gaveta e duas abas](docs/img/ajustes-gaveta.png)
 
 | Gesto no menu | Efeito |
 |---|---|
@@ -298,11 +303,11 @@ calibração está aberta, nenhuma das duas age.
 
 Os mesmos quatro do Orbe do computador, desenhados pelos mesmos shaders:
 
-![Os quatro avatares](img/skins.png)
+![Os quatro avatares](docs/img/skins.png)
 
 Falando, com as linhas do agente embaixo:
 
-![Os quatro avatares falando](img/skins-falando.png)
+![Os quatro avatares falando](docs/img/skins-falando.png)
 
 Na ordem da lista do relógio:
 
@@ -663,7 +668,7 @@ O app é Kotlin com Jetpack Compose para Wear OS (pacote `io.hermes.orbe`). O
 orbe não usa Compose: é OpenGL ES 3.0 direto, como o Qt Quick do desktop.
 
 ```
-orbe-wear/app/src/main/java/io/hermes/orbe/
+app/src/main/java/io/hermes/orbe/
 ├── MainActivity.kt       entrada: extras do adb, permissão, teclado do relógio
 ├── OrbeViewModel.kt      toque, áudio, ponte
 ├── dados/
@@ -686,8 +691,9 @@ orbe-wear/app/src/main/java/io/hermes/orbe/
 ```
 
 **Uma fonte só para a arte.** O build copia os shaders `.frag`, os atlas e as
-imagens de `orbe-qt` para os assets do app. Nada é duplicado no git: o orbe do
-relógio muda quando o do desktop muda.
+imagens de `orbe-desktop/orbe-qt` para os assets do app. Nada é duplicado no
+git: o `orbe-desktop` é um submódulo, e o orbe do relógio muda quando ele sobe
+para um commit novo do desktop (`git submodule update --remote`).
 
 **Shaders do desktop, no relógio.** Os `.frag` do Qt estão em GLSL 440. No
 carregamento, `Sombreador` os converte para GLSL ES 3.00: o cabeçalho passa a
@@ -726,7 +732,7 @@ são medidos do próprio áudio, em janelas de 40 ms.
 
 ## No TicWatch Pro 5
 
-![O app num TicWatch Pro 5 de verdade](img/ticwatch.png)
+![O app num TicWatch Pro 5 de verdade](docs/img/ticwatch.png)
 
 Capturas do app num TicWatch Pro 5 Enduro (Wear OS, tela de 466 px, Adreno 702).
 As demais imagens deste documento vêm do emulador do Wear OS. O emulador usa a
@@ -746,7 +752,6 @@ resolução. O anel roda inteiro.
 ## Compilar, testar e depurar
 
 ```sh
-cd orbe-wear
 ./gradlew :app:assembleRelease          # APK em app/build/outputs/apk/release/
 ./gradlew :app:assembleDebug
 ./gradlew :app:testDebugUnitTest        # 20 testes de unidade
@@ -755,7 +760,7 @@ cd orbe-wear
 
 Os testes cobrem a conversão dos shaders (`SombreadorTest`), o estado e a
 animação do orbe (`OrbeCenaTest`) e a quebra de linha do raciocínio
-(`QuebraTest`). Os testes de shader leem os `.frag` de `orbe-qt` e gravam os
+(`QuebraTest`). Os testes de shader leem os `.frag` de `orbe-desktop/orbe-qt` e gravam os
 convertidos em `app/build/shaders-es`, onde dá para conferi-los ou passá-los
 por um compilador GLSL ES.
 
@@ -798,7 +803,7 @@ emulador como `10.0.2.2`, então o servidor é `10.0.2.2:8777`.
 ## Problemas comuns
 
 <p>
-<img src="img/rodape-recusado.png" width="200" align="right" alt="Rodapé do app com a mensagem token recusado">
+<img src="docs/img/rodape-recusado.png" width="200" align="right" alt="Rodapé do app com a mensagem token recusado">
 </p>
 
 **`token recusado`.** O token do relógio não é o da ponte. Rode
@@ -842,5 +847,5 @@ nas opções do desenvolvedor e reconecte (`adb connect <ip>:<porta>`). O
 ## Créditos
 
 O Orbe, o protocolo do orbe, os shaders e a arte são de Davi Bezerra
-([bbarrosdavi/orbe](https://github.com/bbarrosdavi/orbe)). O Orbe Watch os leva
-para o pulso sem copiá-los: o build usa os de `orbe-qt`.
+([bbarrosdavi/orbe-desktop](https://github.com/bbarrosdavi/orbe-desktop)). O Orbe Watch os leva
+para o pulso sem copiá-los: o build usa os do submódulo `orbe-desktop`.

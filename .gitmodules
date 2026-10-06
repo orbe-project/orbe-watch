@@ -1,0 +1,3 @@
+[submodule "orbe-desktop"]
+	path = orbe-desktop
+	url = https://github.com/bbarrosdavi/orbe-desktop.git

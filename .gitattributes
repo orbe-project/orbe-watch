@@ -1,0 +1,5 @@
+# Scripts de lote do Windows precisam de CRLF; os de shell, de LF.
+*.bat text eol=crlf
+gradlew text eol=lf
+*.png binary
+*.gif binary

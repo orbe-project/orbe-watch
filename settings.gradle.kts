@@ -25,5 +25,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "orbe-wear"
+rootProject.name = "orbe-watch"
 include(":app")
