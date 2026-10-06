@@ -58,11 +58,11 @@ private fun TelaDeExemplo(skin: Skin, instancia: Int, ativas: List<Int>, esperan
     }
 }
 
-@Preview(name = "Olho, 3 instâncias, fundo escolhido", device = "id:wearos_large_round", showSystemUi = true, backgroundColor = 0xFF000000, showBackground = true)
+@Preview(name = "Paranoia, 3 instâncias, fundo escolhido", device = "id:wearos_large_round", showSystemUi = true, backgroundColor = 0xFF000000, showBackground = true)
 @Composable
 fun PreviaOlho() = TelaDeExemplo(Skin.OLHO, instancia = 0, ativas = listOf(0, 1, 2), esperando = null, comImagem = true)
 
-@Preview(name = "Humana, com o Ophanim esperando a vez", device = "id:wearos_large_round", showSystemUi = true, backgroundColor = 0xFF000000, showBackground = true)
+@Preview(name = "Rei dos Ratos, com o Ophanim esperando a vez", device = "id:wearos_large_round", showSystemUi = true, backgroundColor = 0xFF000000, showBackground = true)
 @Composable
 fun PreviaHumanaEsperando() = TelaDeExemplo(Skin.HUMANA, instancia = 1, ativas = listOf(0, 1), esperando = Skin.OFANIM to 1, comImagem = false)
 
