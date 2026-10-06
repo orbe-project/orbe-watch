@@ -97,16 +97,16 @@ class Figura(skinInicial: Skin) : Arte {
         val corpo = DoubleArray(corpos)
         val vcorpo = DoubleArray(corpos)
         val fcorpo = DoubleArray(corpos) { uni(0.0, TAU) }
-        var giro = 0.0
-        var palp = 0.0
-        var vpalp = 0.0
-        var piscaEm = uni(1.5, 4.0)
-        var piscaAte = 0.0
+        // o Olho: os raios fluindo presos ao globo
+        var fluxo = 0.0
+        var amp = 0.0
+        var vamp = 0.0
+        var brilho = 0.0
     }
 
     private fun partes(): Partes {
         st.pc?.let { return it }
-        val p = if (skin == Skin.HUMANA) Partes(27, 3, 8) else Partes(48, 2, 0)
+        val p = if (skin == Skin.HUMANA) Partes(27, 3, 8) else Partes(0, 0, 0)
         st.pc = p
         return p
     }
@@ -262,17 +262,14 @@ class Figura(skinInicial: Skin) : Arte {
         }
         if (humana && chute > 0) for (b in 0 until pc.corpos) pc.vcorpo[b] += (if (Random.nextBoolean()) -1 else 1) * chute * 0.35
         if (!humana) {
-            // a coroa de raios gira; pensando, mais depressa
-            pc.giro += dt * (mistura(0.06, 0.02, 0.35, 0.12, 0.10) + 0.2 * falar)
-            // as pálpebras: apertam pensando, piscam de tempos em tempos, fechadas ao despertar
-            if (t >= pc.piscaEm) {
-                pc.piscaAte = t + 0.11
-                pc.piscaEm = t + uni(2.5, 6.5)
-            }
-            var fecha = if (t < pc.piscaAte) 1.0 else mistura(0.06, 0.0, 0.35, 0.22, 0.08)
-            fecha = max(fecha, 1 - dG)
-            pc.vpalp += (320 * (fecha - pc.palp) - 30 * pc.vpalp) * dt
-            pc.palp = (pc.palp + pc.vpalp * dt).coerceIn(0.0, 1.0)
+            // os raios fluem presos ao olho: a ondulação corre do olho para fora,
+            // com a amplitude numa mola que cada sílaba chuta
+            val alvoA = mistura(3.0, 2.0, 5.0, 3.5, 4.0) + 6 * falar - 3 * (1 - dG)
+            if (chute > 0) pc.vamp += chute * 25
+            pc.vamp += (30 * (alvoA - pc.amp) - 7 * pc.vamp) * dt
+            pc.amp = max(0.0, pc.amp + pc.vamp * dt)
+            pc.fluxo += dt * (mistura(1.4, 1.0, 2.6, 3.6, 2.0) + 1.5 * falar)
+            pc.brilho = mistura(0.25, 0.15, 0.4, 0.3, 0.45) + 0.5 * falar
         }
         // a pupila abre para ouvir e fecha para pensar; encarar a leva ao meio
         val dil = mistura(1.0, 1.15, 0.82, 0.78, 1.04) + 0.12 * ouvir * mic
@@ -409,8 +406,13 @@ class Figura(skinInicial: Skin) : Arte {
                     gy = gy * (1 - pensar) + vy * pensar
                 }
                 val pc = partes()
-                fx.v4("img", pc.giro, 0.0, 0.025 * falar + 0.006 * sin(t * 1.1) * dP, s.pupila)
-                fx.v4("img2", 0.0, s.encarar, pc.palp, 0.0)
+                if (skin == Skin.OLHO) {
+                    fx.v4("img", pc.amp, pc.fluxo, 0.025 * falar + 0.006 * sin(t * 1.1) * dP, 1.0)
+                    fx.v4("img2", pc.brilho, s.encarar, 0.0, 0.0)
+                } else {
+                    fx.v4("img", 0.0, 0.0, 0.025 * falar + 0.006 * sin(t * 1.1) * dP, 1.0)
+                    fx.zero4("img2")
+                }
                 for (m in 0 until 48) {
                     when {
                         m < pc.cadeias -> pc.ang[m].let { a -> fx.v4(NOMES_M[m], a[0], a[1], if (pc.juntas > 2) a[2] else pc.est[m], 0.0) }
