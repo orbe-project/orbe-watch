@@ -1,5 +1,9 @@
 package io.orbe.watch.ui
 
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,6 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
@@ -29,12 +36,30 @@ fun TelaHistorico(
     redonda: Boolean,
     retomar: (String) -> Unit,
     modifier: Modifier = Modifier,
+    fechar: () -> Unit = {},
 ) {
+    val limite = with(LocalDensity.current) { 48.dp.toPx() }
     BoxWithConstraints(
         modifier
             .fillMaxSize()
-            // por cima do orbe: o toque que a lista não usa não chega nele
-            .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent().changes.forEach { it.consume() } } },
+            // por cima do orbe: ser o alvo do toque basta para ele não chegar ao
+            // orbe (irmão de baixo); sem consumir, o arraste para a direita fica
+            // para a caixa de dispensar (OrbeApp), que volta ao orbe
+            .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } }
+            // arrastar para a esquerda também volta ao orbe (o app não fecha)
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    var dx = 0f
+                    val arraste = awaitHorizontalTouchSlopOrCancellation(down.id) { ch, sobra ->
+                        if (sobra < 0) { ch.consume(); dx += sobra }
+                    }
+                    if (arraste != null && dx < 0) {
+                        horizontalDrag(arraste.id) { ch -> dx += ch.positionChange().x; ch.consume() }
+                        if (dx < -limite) fechar()
+                    }
+                }
+            },
     ) {
         FundoVidro()
         val margem = maxWidth * (if (redonda) 0.12f else 0.05f)

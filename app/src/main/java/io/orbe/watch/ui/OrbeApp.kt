@@ -1,5 +1,8 @@
 package io.orbe.watch.ui
 
+import androidx.wear.compose.foundation.BasicSwipeToDismissBox
+import androidx.wear.compose.foundation.LocalSwipeToDismissBackgroundScrimColor
+import androidx.wear.compose.foundation.LocalSwipeToDismissContentScrimColor
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -178,7 +181,19 @@ fun OrbeApp(
             null -> Unit
         }
         historico?.let { h ->
-            TelaHistorico(h, nomeAgente(ajustes, aparencia.skin, agentesPc), listaHistorico, redonda, retomar = vm::retomar)
+            // arrastar para a direita fecha só o histórico e volta ao orbe: sem a
+            // caixa, o arraste ia ao sistema, que fechava o app inteiro
+            CompositionLocalProvider(
+                LocalSwipeToDismissBackgroundScrimColor provides Color.Transparent,
+                LocalSwipeToDismissContentScrimColor provides Color.Transparent,
+            ) {
+                BasicSwipeToDismissBox(onDismissed = vm::fecharHistorico) { fundo ->
+                    if (!fundo) {
+                        TelaHistorico(h, nomeAgente(ajustes, aparencia.skin, agentesPc), listaHistorico, redonda,
+                            retomar = vm::retomar, fechar = vm::fecharHistorico)
+                    }
+                }
+            }
         }
       }
     }

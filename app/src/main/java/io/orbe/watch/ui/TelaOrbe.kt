@@ -125,7 +125,7 @@ private val BORDA_ROTULO = 6.dp
 /** as miniaturas das instâncias ativas, no pé */
 private val LADO_INSTANCIA = 14.dp
 /** a do orbe que espera a vez de falar, no canto de baixo à direita */
-private val LADO_ESPERA = 26.dp
+private val LADO_ESPERA = 32.dp
 private const val ARCO_TITULO = 150f
 private const val ARCO_ROTULO = 100f
 
@@ -279,8 +279,9 @@ fun TelaOrbe(
                 Papel.INSTANCIA, skinE, LADO_ESPERA, LADO_ESPERA, glitch = false, linhas = false,
                 corE, aparencia.tema.anel, aparencia.tema.fundo,
             )
-            // por dentro do mostrador redondo: a 45° do centro
-            val r = min(w, h) / 2 * 0.66f * 0.7071f
+            // por dentro do mostrador redondo, perto da borda: a 45° do centro,
+            // a 80% do raio (o canto dela fica dentro do redondo)
+            val r = min(w, h) / 2 * 0.80f * 0.7071f
             Miniatura(chave, Modifier.align(Alignment.Center).offset(x = r.dp, y = r.dp).size(LADO_ESPERA))
         }
 
