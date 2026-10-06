@@ -20,6 +20,10 @@ data class Ola(
     val tema: Map<String, String> = emptyMap(),
     /** o papel de parede do PC atrás do app, em n x n cores (linha a linha, de cima); vazio sem ele */
     val papel: List<String> = emptyList(),
+    /** a imagem escolhida no app do PC para o fundo daqui (JPEG em base64); vazia: segue o [papel] */
+    @SerialName("papel_imagem") val papelImagem: String = "",
+    /** muda quando a imagem muda: decodificar só uma vez */
+    @SerialName("papel_id") val papelId: String = "",
     /** a ponte aceita a fala do relógio */
     val microfone: Boolean = false,
     /** quem serve a ponte manda a voz para tocar aqui (o orbe de pulso, e o daemon na sessão do relógio) */

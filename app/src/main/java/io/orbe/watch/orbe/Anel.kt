@@ -361,6 +361,7 @@ class Anel : Arte {
     private val campos = DoubleArray(nW)
     private var semLinguas = true
     override val variante: Map<String, Int> get() = if (semLinguas) SEM_LINGUAS else emptyMap()
+    override val outraVariante: Map<String, Int> get() = if (semLinguas) emptyMap() else SEM_LINGUAS
 
     override fun montar(w: Double, h: Double, cx: Double, cy: Double, cw: Double, ch: Double) {
         if (!temPb) return

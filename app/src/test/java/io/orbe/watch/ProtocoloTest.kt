@@ -67,4 +67,13 @@ class ProtocoloTest {
         assertEquals("#4DD0E1", e[0].cor)
         assertEquals(emptyList<Any>(), Protocolo.esperas("[]"))
     }
+
+    @Test
+    fun oOlaTrazAImagemDoFundo() {
+        val ola = Protocolo.ola("""{"v": 1, "papel": ["#000000", "#ffffff", "#000000", "#ffffff"], "papel_imagem": "/9j/4AAQ", "papel_id": "ab12"}""")!!
+        assertEquals("/9j/4AAQ", ola.papelImagem)
+        assertEquals("ab12", ola.papelId)
+        // a ponte antiga não manda: segue o papel do PC
+        assertEquals("", Protocolo.ola("""{"v": 1}""")!!.papelImagem)
+    }
 }

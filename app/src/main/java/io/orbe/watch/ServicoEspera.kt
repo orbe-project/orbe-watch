@@ -84,8 +84,12 @@ class ServicoEspera : Service() {
             ContextCompat.startForegroundService(c, Intent(c, ServicoEspera::class.java).setAction(PARAR))
         }
 
-        /** A resposta chegou: acende a tela e traz o orbe para a frente. */
+        /** A resposta chegou: acende a tela e traz o orbe para a frente (não por cima da Hina). */
         fun trazer(c: Context) {
+            if (Vizinhos.hinaNaFrente(c)) {
+                Log.i(TAG, "resposta: a Hina está na tela, o orbe fica atrás; a voz toca assim mesmo")
+                return
+            }
             if (!Settings.canDrawOverlays(c)) {
                 Log.w(TAG, "sem permissão de sobreposição: o Android bloqueia abrir a tela a partir do serviço; a voz toca assim mesmo")
             }

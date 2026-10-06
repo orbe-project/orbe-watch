@@ -602,7 +602,7 @@ private fun GraphicsLayerScope.roda(desvio: Float, vertical: Boolean) {
  * Com o raciocínio na tela, o pé é dele.
  */
 @Composable
-private fun RotuloSessao(
+internal fun RotuloSessao(
     sessao: SessaoInfo?, abreClaude: Boolean, agente: String, cor: Color, comPe: Boolean, modifier: Modifier = Modifier,
     /** as instâncias ativas do orbe (e se é a em tela), em miniatura antes da pasta */
     miniaturas: List<Pair<ChavePrevia, Boolean>> = emptyList(),
