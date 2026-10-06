@@ -46,11 +46,11 @@ val copiarArte = tasks.register<CopiarArte>("copiarArte") {
 }
 
 android {
-    namespace = "io.hermes.orbe"
+    namespace = "io.orbe.watch"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "io.hermes.orbe"
+        applicationId = "io.orbe.watch"
         minSdk = 30
         targetSdk = 36
         versionCode = 1

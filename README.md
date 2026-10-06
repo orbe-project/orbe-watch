@@ -34,15 +34,15 @@ A ponte fala o mesmo protocolo de linhas do orbe do desktop (`show`, `state`,
 `level`, `line`…), então o orbe do pulso é igual ao do computador, estado por
 estado. Ela é servida de dois jeitos:
 
-- **Pelo daemon** (`hermes_voice_daemon.py`), no Linux com o desktop. A sessão
+- **Pelo daemon** (`orbe_daemon.py`), no Linux com o desktop. A sessão
   aberta pelo relógio ouve só o microfone do relógio e toca a resposta onde o
   relógio pediu.
-- **Pelo orbe de pulso** (`hermes_voice_pulso.py`), sem o desktop: Python puro,
+- **Pelo orbe de pulso** (`orbe_pulso.py`), sem o desktop: Python puro,
   testado no Windows.
 
 Os dois scripts são do [orbe-desktop](https://github.com/orbe-project/orbe-desktop),
 que também é o submódulo `orbe-desktop/` deste repositório. Os comandos
-`./hermes_voice_*.py` e `./claude-orbe` abaixo rodam na pasta dele.
+`./orbe_*.py` e `./claude-orbe` abaixo rodam na pasta dele.
 
 ## Requisitos
 
@@ -60,11 +60,11 @@ que também é o submódulo `orbe-desktop/` deste repositório. Os comandos
 ```sh
 pip install websockets requests
 ./claude-orbe                                  # Claude Code com o canal do orbe
-./hermes_voice_pulso.py --agente claude        # ou --comando "<agente ACP>" --pasta ~/projeto
+./orbe_pulso.py --agente claude        # ou --comando "<agente ACP>" --pasta ~/projeto
 ```
 
 Com o daemon, ligue o grupo **Relógio** na aba Ativação do app do Orbe, ou
-rode `./hermes_voice_relogio.py --ligar` e reinicie o serviço. Os dois mostram
+rode `./orbe_relogio.py --ligar` e reinicie o serviço. Os dois mostram
 o endereço e o **token** do pareamento. A ponte abre a porta **8777** na rede
 local e só conversa com quem tem o token.
 
@@ -83,12 +83,12 @@ com a sua.
 **3. Parear.** Pelo adb, sem digitar no pulso:
 
 ```sh
-adb shell am start -n io.hermes.orbe/.MainActivity --es servidor 192.168.0.10 --es token abcd2345
+adb shell am start -n io.orbe.watch/.MainActivity --es servidor 192.168.0.10 --es token abcd2345
 ```
 
 Ou no menu do relógio, **Conexão → Servidor** e **Token**. O servidor aceita
 `192.168.0.10`, `192.168.0.10:9000`, `[fd7a::1]:8777` ou `wss://orbe.exemplo.com`.
-Para ver o relógio funcionando sem agente, `./hermes_voice_relogio.py --demo`.
+Para ver o relógio funcionando sem agente, `./orbe_relogio.py --demo`.
 
 ## Usando
 
@@ -175,9 +175,9 @@ As sessões abertas pelo orbe (`claude-orbe`) ouvem pelo canal MCP. As abertas
 à mão ouvem por um hook do usuário, instalado uma vez:
 
 ```sh
-./hermes_voice_sessao.py --instalar   # põe o hook no ~/.claude/settings.json
-./hermes_voice_sessao.py              # lista as sessões e como cada uma ouve
-./hermes_voice_sessao.py --remover    # tira o hook
+./orbe_sessao.py --instalar   # põe o hook no ~/.claude/settings.json
+./orbe_sessao.py              # lista as sessões e como cada uma ouve
+./orbe_sessao.py --remover    # tira o hook
 ```
 
 O pedido feito com a sessão no meio de um turno entra na fila do Claude Code,
@@ -229,7 +229,7 @@ O protocolo completo está em [docs/protocolo.md](docs/protocolo.md).
 ./gradlew :app:lintRelease
 ```
 
-O app é Kotlin com Jetpack Compose (pacote `io.hermes.orbe`); o orbe é OpenGL
+O app é Kotlin com Jetpack Compose (pacote `io.orbe.watch`); o orbe é OpenGL
 ES 3.0 direto, num contexto EGL e numa thread só para todos os orbes.
 
 - **Arte de uma fonte só.** O build copia os shaders, atlas e imagens de
@@ -245,8 +245,8 @@ Diagnóstico no relógio:
 
 ```sh
 adb shell setprop log.tag.Orbe VERBOSE                                # quadros, atrasos e máscara a cada 2 s
-adb shell am start -n io.hermes.orbe/.MainActivity --ef qualidade 0.5 # trava a máscara
-adb shell am start -n io.hermes.orbe/.MainActivity --es menu agentes  # abre uma aba do menu
+adb shell am start -n io.orbe.watch/.MainActivity --ef qualidade 0.5 # trava a máscara
+adb shell am start -n io.orbe.watch/.MainActivity --es menu agentes  # abre uma aba do menu
 ```
 
 O VERBOSE espera a GPU a cada quadro para medir: volte a `INFO` depois. No
@@ -254,7 +254,7 @@ emulador, o computador é `10.0.2.2`.
 
 ## Problemas comuns
 
-- **`token recusado`:** rode `./hermes_voice_relogio.py` para ver o token
+- **`token recusado`:** rode `./orbe_relogio.py` para ver o token
   atual (o alfabeto não tem `l`, `1`, `0` nem `o`). Cinco erros trancam a
   origem até reiniciar a ponte.
 - **`conectando…` sem fim:** confira o IP, o firewall (porta 8777) e a rede.

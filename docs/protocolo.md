@@ -1,6 +1,6 @@
 # Protocolo da ponte
 
-Um WebSocket entre o relógio e a ponte (`hermes_voice_relogio.py`, no [orbe-desktop](https://github.com/orbe-project/orbe-desktop)). Mensagens de texto são uma linha cada; as binárias são PCM
+Um WebSocket entre o relógio e a ponte (`orbe_relogio.py`, no [orbe-desktop](https://github.com/orbe-project/orbe-desktop)). Mensagens de texto são uma linha cada; as binárias são PCM
 `s16le` mono.
 
 | Sentido | Mensagem | Quando |
