@@ -544,7 +544,10 @@ class Figura(skinInicial: Skin) : Arte {
         pos.v4("glt", sep, if (rajada) 1.0 else 0.0, if (rajada) Random.nextDouble() * 1000 else 0.0, k)
         pos.v4("geo2", rb, lim, (t * 18) % 3, if (varredura && !skin.imagem) 1.0 else 0.0)
         pos.zero4("sombra")
-        pos.v4("corSombra", corFundo[0].toDouble(), corFundo[1].toDouble(), corFundo[2].toDouble(), 1.0)
+        // nas gravuras recortadas a massa é preta, como no desenho (no tom do fundo
+        // do tema ela levantava as sombras e lavava a imagem)
+        if (skin.polar) pos.v4("corSombra", 0.0, 0.0, 0.0, 1.0)
+        else pos.v4("corSombra", corFundo[0].toDouble(), corFundo[1].toDouble(), corFundo[2].toDouble(), 1.0)
         pos.v4("modo", 0.0, 1.0, 0.0, 0.0)
     }
 
