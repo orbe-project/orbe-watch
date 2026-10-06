@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -55,16 +56,23 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.wear.compose.foundation.CurvedDirection
+import androidx.wear.compose.foundation.CurvedLayout
+import androidx.wear.compose.foundation.CurvedModifier
+import androidx.wear.compose.foundation.CurvedTextStyle
+import androidx.wear.compose.foundation.basicCurvedText
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumn
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnItemScope
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnScope
 import androidx.wear.compose.foundation.lazy.TransformingLazyColumnState
+import androidx.wear.compose.foundation.sizeIn
 import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.lazy.TransformationSpec
 import androidx.wear.compose.material3.lazy.rememberTransformationSpec
@@ -387,7 +395,16 @@ fun LinhaSwitch(
     }
 }
 
-/** Miniatura animada de uma skin, com o nome e, embaixo, a [nota] (o agente dela). */
+/** A faixa da borda do cartão redondo que cada nome em arco ocupa, no alto e no pé. */
+val FAIXA_CARTAO = 13.dp
+private val BORDA_NOME = 3.dp
+private const val ARCO_NOME = 160f
+
+/**
+ * Miniatura animada de uma skin num cartão redondo, como o mostrador: o nome
+ * dela em arco no alto e a [nota] (o agente dela) em arco no pé, como o rótulo
+ * da tela do orbe. O cartão é um círculo da largura que o [modifier] der.
+ */
 @Composable
 fun Cartao(
     previa: ChavePrevia,
@@ -398,23 +415,39 @@ fun Cartao(
 ) {
     val fonte = remember { MutableInteractionSource() }
     val apertado by fonte.collectIsPressedAsState()
-    val forma = RoundedCornerShape(12.dp)
-    Column(
+    val corNome = if (marcado) Estilo.accent else Estilo.texto
+    val corNota = Estilo.texto.alfa(0.55f)
+    Box(
         modifier
-            .clip(forma)
+            .aspectRatio(1f)
+            .clip(CircleShape)
             .background(if (marcado) Estilo.accent.alfa(0.14f) else Estilo.texto.alfa(if (apertado) 0.07f else 0.04f))
-            .border(1.dp, if (marcado) Estilo.accent.alfa(0.55f) else Estilo.texto.alfa(0.08f), forma)
-            .clickable(fonte, indication = null, onClick = aoEscolher)
-            .padding(4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .border(1.dp, if (marcado) Estilo.accent.alfa(0.55f) else Estilo.texto.alfa(0.08f), CircleShape)
+            .clickable(fonte, indication = null, onClick = aoEscolher),
+        contentAlignment = Alignment.Center,
     ) {
         Miniatura(previa, Modifier.size(previa.largura, previa.altura))
-        // os nomes compridos ("Ophanim com asas") quebram em duas linhas; a caixa reserva as duas
-        Box(Modifier.fillMaxWidth().height(21.dp), contentAlignment = Alignment.Center) {
-            Texto(previa.skin.nome, Estilo.cartao, cor = if (marcado) Estilo.accent else Estilo.texto, alinhar = TextAlign.Center, linhas = 2)
-        }
-        if (nota != null) {
-            Texto(nota, Estilo.subtitulo, Modifier.fillMaxWidth(), cor = Estilo.texto.alfa(0.55f), alinhar = TextAlign.Center, linhas = 1)
+        Box(Modifier.fillMaxSize().padding(BORDA_NOME)) {
+            CurvedLayout(anchor = 270f) {
+                basicCurvedText(
+                    previa.skin.nome,
+                    style = { CurvedTextStyle(color = corNome, fontSize = Estilo.cartao.fontSize, fontWeight = FontWeight.Bold) },
+                    modifier = CurvedModifier.sizeIn(maxSweepDegrees = ARCO_NOME),
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (nota != null) {
+                // no pé a leitura é da esquerda para a direita: o sentido contrário ao do alto
+                CurvedLayout(anchor = 90f, angularDirection = CurvedDirection.Angular.Reversed) {
+                    basicCurvedText(
+                        nota,
+                        style = { CurvedTextStyle(color = corNota, fontSize = Estilo.cartao.fontSize) },
+                        modifier = CurvedModifier.sizeIn(maxSweepDegrees = ARCO_NOME),
+                        angularDirection = CurvedDirection.Angular.Reversed,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
     }
 }

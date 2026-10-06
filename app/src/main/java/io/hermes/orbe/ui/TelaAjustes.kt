@@ -66,9 +66,6 @@ enum class Aba(val nome: String, val icone: Int, val descricao: String) {
 /** Altura do orbe no alto da gaveta: com as duas fileiras de botões, a gaveta cabe na tela sem rolar. */
 private val ALTURA_TOPO = 64.dp
 
-/** Altura da figura no cartão de avatar (a do app: 100 dp de cartão, menos o nome e a margem). */
-private val ALTURA_CARTAO = 71.dp
-
 /** Puxão que conta no menu: distância ou velocidade (as do HinaWatch). */
 private val VOLTA_DISTANCIA = 40.dp
 private val VOLTA_VELOCIDADE = 400.dp
@@ -135,7 +132,7 @@ fun TelaAjustes(
         val topo = ChavePrevia(Papel.TOPO, Skin.OFANIM, largura, ALTURA_TOPO, glitch = true, linhas = true, tema.accent, tema.anel, tema.fundo)
         val cartao = { skin: Skin ->
             ChavePrevia(
-                Papel.CARTAO, skin, larguraCartao(largura), ALTURA_CARTAO,
+                Papel.CARTAO, skin, ladoCartao(largura), ladoCartao(largura),
                 aparencia.glitch, aparencia.linhas, tema.accent, tema.anel, tema.fundo,
             )
         }
@@ -411,5 +408,8 @@ private fun Modifier.puxar(esquerda: () -> Unit, direita: () -> Unit): Modifier 
 
 private fun um(v: Float) = "%.1f".format(v).replace('.', ',')
 
-/** A largura da figura num cartão de avatar: dois cartões por fileira, 8 dp entre eles e 4 de margem dentro. */
-private fun larguraCartao(largura: Dp): Dp = (largura - 8.dp) / 2 - 8.dp
+/**
+ * O lado da figura num cartão de avatar: dois cartões redondos por fileira, 8 dp
+ * entre eles, e a figura entre o nome em arco no alto e o agente no pé.
+ */
+private fun ladoCartao(largura: Dp): Dp = (largura - 8.dp) / 2 - FAIXA_CARTAO * 2
