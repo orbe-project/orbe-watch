@@ -117,6 +117,8 @@ data class Sincronia(
     // PC) é "não sei", e o relógio fica com o que tem.
     /** a ação de 1, 2, 3 e 4 toques ([AcaoToque]) */
     val toques: List<String>? = null,
+    /** a ação de 1, 2, 3 e 4 toques com o último segurado */
+    val segurar: List<String>? = null,
     val live: Boolean? = null,
     val fundo: Boolean? = null,
     /** a ordem dos orbes na lista, pelas skins */
@@ -141,6 +143,9 @@ object Protocolo {
     } catch (e: Exception) {
         null
     }
+
+    /** O olá como o relógio o guarda (o inverso de [ola]). */
+    fun guardar(o: Ola): String = json.encodeToString(Ola.serializer(), o)
 
     // os ajustes vão inteiros: um campo no valor padrão omitido deixaria o do PC como estava
     private val inteiro = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }

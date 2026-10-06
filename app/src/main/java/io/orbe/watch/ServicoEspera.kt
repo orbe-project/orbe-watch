@@ -34,7 +34,11 @@ class ServicoEspera : Service() {
             }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_NOT_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // só sai se nenhum ligar chegou depois deste pedido de parar
+        if (intent?.action == PARAR) stopSelf(startId)
+        return START_NOT_STICKY
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -60,6 +64,7 @@ class ServicoEspera : Service() {
         private const val TAG = "OrbeEspera"
         private const val CANAL = "espera"
         private const val NOTIFICACAO = 8
+        private const val PARAR = "io.orbe.watch.PARAR_ESPERA"
         /** O teto da espera: o mesmo do daemon esperando a resposta de um agente. */
         const val TETO_MS = 10 * 60_000L
         /** Quanto a tela fica acesa pela resposta, até o orbe abrir e segurar ela. */
@@ -69,8 +74,14 @@ class ServicoEspera : Service() {
             ContextCompat.startForegroundService(c, Intent(c, ServicoEspera::class.java))
         }
 
+        /**
+         * O pedido de parar passa pelo próprio serviço: um stopService antes do
+         * onCreate (sair e voltar logo, com a main ocupada) derruba o app no
+         * Android 8 a 11 ("did not then call Service.startForeground()"). Pela
+         * fila do serviço, o startForeground do onCreate sempre vem antes.
+         */
         fun desligar(c: Context) {
-            c.stopService(Intent(c, ServicoEspera::class.java))
+            ContextCompat.startForegroundService(c, Intent(c, ServicoEspera::class.java).setAction(PARAR))
         }
 
         /** A resposta chegou: acende a tela e traz o orbe para a frente (não por cima da Hina). */

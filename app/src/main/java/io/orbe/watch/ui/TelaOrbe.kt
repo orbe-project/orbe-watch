@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
@@ -132,7 +133,9 @@ private const val ARCO_ROTULO = 100f
  * texto "abaixo". Um toque abre a sessão (ou já no live, com a opção), outro
  * com ela aberta entra no live (os turnos seguem sem tocar); no live, um toque
  * interrompe a fala, ou fecha se o orbe só ouve. Três toques encerram a sessão
- * e o Claude Code no PC. Segurar é segurar para falar.
+ * e o Claude Code no PC. Segurar é segurar para falar, e tocar e segurar abre
+ * o histórico (cada número de toques, curtos ou com o último segurado, tem a
+ * ação escolhida no menu).
  *
  * Os orbes ficam numa lista vertical, uma skin por página, que rola como os
  * avatares do HinaWatch: com inércia, o orbe encolhendo ao sair do centro e os
@@ -215,7 +218,11 @@ fun TelaOrbe(
         ) { pagina ->
             val skin = skins[pagina.mod(nSkins)]
             val emTela = pagina == paginas.settledPage
-            val daPagina = if (skin == aparencia.skin) aparencia else aparencia.copy(skin = skin, instancia = 0)
+            val (ag, grupo) = grupos[skin] ?: ("claude" to emptyList())
+            val j = grupo.indexOf(skin)
+            // os outros orbes aparecem na instância em que ficaram
+            val daPagina = if (skin == aparencia.skin) aparencia
+                else aparencia.copy(skin = skin, instancia = if (j >= 0) ajustes.instanciaDe(skin) else 0)
             val agente = nomeAgente(ajustes, skin, agentesPc)
             Box(
                 Modifier
@@ -223,8 +230,6 @@ fun TelaOrbe(
                     // lido no desenho: a rolagem não recompõe as páginas
                     .graphicsLayer { roda(paginas.currentPage - pagina + paginas.currentPageOffsetFraction, vertical = true) },
             ) {
-                val (ag, grupo) = grupos[skin] ?: ("claude" to emptyList())
-                val j = grupo.indexOf(skin)
                 if (j >= 0) {
                     // as vagas se alternam entre os orbes do agente: cada um tem as suas
                     val m = grupo.size
@@ -374,11 +379,12 @@ private fun PontosDaLista(n: Int, posicao: () -> Float, modifier: Modifier = Mod
 
 /**
  * As instâncias de um orbe com elas (do Claude, ou de um agente numa janela),
- * uma embaixo da outra: a 0 é o próprio orbe e as seguintes são as vagas dele
- * de sessão aberta no PC, e por
- * fim uma livre quando falar nela abre uma sessão. Dois dedos na vertical
- * passam de uma a outra, com a mesma roda da lista; um dedo continua sendo da
- * lista (de um orbe a outro), do menu e do voltar do sistema.
+ * uma em cima da outra: a 0 é o próprio orbe e as seguintes são as vagas dele
+ * de sessão aberta no PC, e por fim uma livre quando falar nela abre uma
+ * sessão. Dois dedos arrastando para baixo trazem a seguinte (e para cima, a
+ * anterior), com a mesma roda da lista; um dedo continua sendo da lista (de um
+ * orbe a outro), do menu e do voltar do sistema. Cada orbe volta na instância
+ * em que ficou ([Ajustes.instancias]).
  */
 @Composable
 private fun Fileira(
@@ -393,7 +399,7 @@ private fun Fileira(
     pode: () -> Boolean,
     rotulo: @Composable BoxScope.(instancia: Int, atual: Boolean) -> Unit,
 ) {
-    val fileira = lembrarFileira(initialPage = if (emTela) aparencia.instancia.coerceIn(0, n - 1) else 0) { n }
+    val fileira = lembrarFileira(initialPage = aparencia.instancia.coerceIn(0, n - 1)) { n }
     val escopo = rememberCoroutineScope()
     val view = LocalView.current
     val agora by rememberUpdatedState(aparencia)
@@ -405,7 +411,7 @@ private fun Fileira(
         }
         // assentou noutra pelos dedos (ou a fileira encurtou): é a instância do relógio
         LaunchedEffect(fileira) {
-            snapshotFlow { fileira.settledPage }.collect { k -> if (k != agora.instancia) vm.instancia(k) }
+            snapshotFlow { fileira.settledPage }.collect { k -> if (k != agora.instancia) vm.instancia(k, agora.skin) }
         }
     }
     Box(Modifier.fillMaxSize().pointerInput(fileira) { doisDedos(fileira, escopo, view) }) {
@@ -414,12 +420,14 @@ private fun Fileira(
             modifier = Modifier.fillMaxSize(),
             beyondViewportPageCount = 0,
             userScrollEnabled = false,           // um dedo é da lista e do menu; dois, daqui
+            reverseLayout = true,                // a seguinte vem de cima: arrastar para baixo
         ) { k ->
             val atual = emTela && k == fileira.settledPage
             Box(
                 Modifier
                     .fillMaxSize()
-                    .graphicsLayer { roda(fileira.currentPage - k + fileira.currentPageOffsetFraction, vertical = true) },
+                    // de baixo para cima, o desvio da roda vira de sinal
+                    .graphicsLayer { roda(k - fileira.currentPage - fileira.currentPageOffsetFraction, vertical = true) },
             ) {
                 Orbe(vm, aparencia.copy(instancia = k), atual, tamanho, redonda, pode)
                 rotulo(k, atual)
@@ -484,9 +492,9 @@ private suspend fun PointerInputScope.tocar(vm: OrbeViewModel, densidade: Float,
         }
         when (fim) {
             1 -> vm.toqueCurto(pode())
-            2 -> vm.toqueCancelado()
+            2 -> vm.toqueCancelado(pode())
             else -> {
-                vm.toqueSegurou()
+                vm.toqueSegurou(pode())
                 while (true) {
                     val c = awaitPointerEvent().changes.firstOrNull { it.id == baixo.id } ?: break
                     c.consume()          // segurando, o dedo não rola a tela
@@ -500,7 +508,8 @@ private suspend fun PointerInputScope.tocar(vm: OrbeViewModel, densidade: Float,
 }
 
 /**
- * Dois dedos na vertical passam de uma instância a outra. O segundo dedo tem
+ * Dois dedos na vertical passam de uma instância a outra: para baixo, a
+ * seguinte (a fileira vai de baixo para cima). O segundo dedo tem
  * que chegar antes do tempo de segurar (depois disso o primeiro já está
  * falando); daí em diante o gesto é todo da fileira, e nem a lista, nem o
  * menu, nem o voltar do sistema o veem: a fileira trata os dedos antes da
@@ -533,7 +542,7 @@ private suspend fun PointerInputScope.doisDedos(fileira: EstadoFileira, escopo: 
                 val c = centro(e)
                 // um dedo que entra ou sai muda o centro sem que a mão ande
                 if (agora == dedos) {
-                    deltas.trySend(antes - c)
+                    deltas.trySend(c - antes)
                     rastro.addPosition(e.changes.first { it.pressed }.uptimeMillis, Offset(0f, c))
                 }
                 dedos = agora
@@ -546,8 +555,8 @@ private suspend fun PointerInputScope.doisDedos(fileira: EstadoFileira, escopo: 
                 arrasto.join()
                 val pos = fileira.currentPage + fileira.currentPageOffsetFraction
                 val alvo = when {
-                    v < -arremesso -> floor(pos).toInt() + 1
-                    v > arremesso -> ceil(pos).toInt() - 1
+                    v > arremesso -> floor(pos).toInt() + 1
+                    v < -arremesso -> ceil(pos).toInt() - 1
                     else -> pos.roundToInt()
                 }
                 fileira.animateScrollToPage(alvo.coerceIn(0, max(0, fileira.pageCount - 1)))
@@ -596,13 +605,14 @@ internal fun RotuloSessao(
 }
 
 /**
- * O rótulo curvado na borda: [alto] na [cor] do orbe, [pe] apagado embaixo.
- * As [miniaturas] vão no pé antes do texto, na diagonal de baixo à esquerda;
- * a da instância em tela inteira, as outras apagadas.
+ * O rótulo curvado na borda: [alto] cinza com um resto da [cor] do orbe (que
+ * diz a instância sem competir com ele), [pe] apagado embaixo. As [miniaturas]
+ * vão no pé antes do texto, na diagonal de baixo à esquerda; a da instância
+ * em tela inteira, as outras apagadas.
  */
 @Composable
 private fun Rotulo(alto: String, pe: String, cor: Color, modifier: Modifier = Modifier, miniaturas: List<Pair<ChavePrevia, Boolean>> = emptyList()) {
-    val corTitulo = cor.alfa(0.75f)
+    val corTitulo = lerp(cor, Estilo.texto, 0.7f).alfa(0.55f)
     val corPe = Estilo.texto.alfa(0.45f)
     Box(modifier.padding(BORDA_ROTULO)) {
         if (alto.isNotEmpty()) {

@@ -353,9 +353,15 @@ class Figura(skinInicial: Skin) : Arte {
     private val p1 = DoubleArray(2)
     private val on = DoubleArray(16)
 
+    // os nomes dos uniforms das asas e dos aros, montados uma vez: o quadro não aloca string
+    private val nomesAsaA = Array(4) { "w${it}a" }
+    private val nomesAsaB = Array(4) { "w${it}b" }
+    private val nomesAroU = Array(4) { "a${it}u" }
+    private val nomesAroV = Array(4) { "a${it}v" }
+
     private fun asaVec(slot: Int, rx: Double, ry: Double, ang: Double, comp: Double, lado: Double, abert: Double, olhos: Double) {
-        fx.v4("w${slot}a", rx, ry, ang, comp)
-        fx.v4("w${slot}b", lado, abert, olhos, 0.0)
+        fx.v4(nomesAsaA[slot], rx, ry, ang, comp)
+        fx.v4(nomesAsaB[slot], lado, abert, olhos, 0.0)
     }
 
     // monta os uniforms do quadro
@@ -453,12 +459,12 @@ class Figura(skinInicial: Skin) : Arte {
                     val abA = mistura(0.25, 0.7, 1.0, 0.9, 0.85) * deA
                     val batA = sin(s.faseAsa)
                     var slot = 0
-                    for (ld in doubleArrayOf(-1.0, 1.0)) {
+                    for (ld in LADOS) {
                         asaVec(slot++, cx + ld * 0.52 * r, cy - 0.22 * r, sup + ampA * batA, 0.88 * r * deA, ld, abA, 3.0)
                         asaVec(slot++, cx + ld * 0.46 * r, cy + 0.30 * r, inf - 0.5 * ampA * batA, 0.66 * r * deA, ld, abA * 0.8, 2.0)
                     }
                 } else {
-                    for (i in 0..3) fx.zero4("w${i}a")
+                    for (i in 0..3) fx.zero4(nomesAsaA[i])
                 }
 
                 // aros
@@ -468,8 +474,8 @@ class Figura(skinInicial: Skin) : Arte {
                         (1 + 0.09 * falar * sin(t * 9 + i * 1.7)) *
                         (1 + 0.025 * pensar * sin(t * 2.2 + i))
                     rs[i] = rr
-                    fx.v4("a${i}u", us[i][0], us[i][1], us[i][2], rr)
-                    fx.v4("a${i}v", vs[i][0], vs[i][1], vs[i][2], 0.0)
+                    fx.v4(nomesAroU[i], us[i][0], us[i][1], us[i][2], rr)
+                    fx.v4(nomesAroV[i], vs[i][0], vs[i][1], vs[i][2], 0.0)
                 }
                 // relâmpagos entre os olhos dos aros (Ez 1:14)
                 val info = DoubleArray(4)
@@ -564,3 +570,6 @@ class Figura(skinInicial: Skin) : Arte {
         val LIM_RAIO = doubleArrayOf(0.5, 0.75)
     }
 }
+
+/** os dois lados das asas, sem um array novo por quadro */
+private val LADOS = doubleArrayOf(-1.0, 1.0)

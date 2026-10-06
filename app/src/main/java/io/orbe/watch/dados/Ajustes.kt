@@ -15,7 +15,7 @@ import io.orbe.watch.gesto.Sacudida
 import io.orbe.watch.orbe.Skin
 import kotlinx.coroutines.flow.map
 
-/** O que um número de toques curtos no orbe faz. */
+/** O que um número de toques no orbe faz: todos curtos ([Ajustes.toques]) ou o último segurado ([Ajustes.segurar]). */
 enum class AcaoToque(val id: String, val nome: String) {
     /** fechado, abre (ou já no live, com a opção); aberto, entra no live; no live, interrompe, e só ouvindo, fecha */
     ABRIR("abrir", "Abrir"),
@@ -25,12 +25,18 @@ enum class AcaoToque(val id: String, val nome: String) {
     ENCERRAR("encerrar", "Encerrar"),
     /** as sessões passadas do agente do orbe, para retomar uma */
     HISTORICO("historico", "Histórico"),
+    /** segurar para falar: a fala vai enquanto o dedo fica (só no toque segurado) */
+    FALAR("falar", "Falar"),
     NADA("nada", "Nada");
 
     companion object {
         fun de(id: String?): AcaoToque? = entries.firstOrNull { it.id == id }
         /** um, dois e três toques como sempre foram; quatro, nada */
         val PADRAO = listOf(ABRIR, LIVE, ENCERRAR, NADA)
+        /** segurar fala, como sempre foi; tocar e segurar abre o histórico */
+        val PADRAO_SEGURAR = listOf(FALAR, HISTORICO, NADA, NADA)
+        /** as que os toques curtos ciclam (falar só segurando) */
+        val CURTAS = entries.filter { it != FALAR }
     }
 }
 
@@ -43,6 +49,8 @@ data class Ajustes(
     val skin: String = "ofanim",
     /** a instância em tela no orbe do Claude: a sessão da vaga dela (Instancias); 0 = o próprio orbe */
     val instancia: Int = 0,
+    /** a última instância de cada orbe, pela skin: voltar a ele é voltar a ela */
+    val instancias: Map<String, Int> = emptyMap(),
     val glitch: Boolean = true,
     /** as linhas de varredura (o tubo de TV), nas skins desenhadas */
     val linhas: Boolean = true,
@@ -79,6 +87,8 @@ data class Ajustes(
     val live: Boolean = false,
     /** o que 1, 2, 3 e 4 toques curtos no orbe fazem */
     val toques: List<AcaoToque> = AcaoToque.PADRAO,
+    /** o que 1, 2, 3 e 4 toques fazem com o último segurado (1 = só segurar) */
+    val segurar: List<AcaoToque> = AcaoToque.PADRAO_SEGURAR,
     /** limiares da sacudida em rad/s (fora e dentro); a calibração troca */
     val sacudidaFora: Float = Sacudida.FORA_MIN,
     val sacudidaDentro: Float = Sacudida.DENTRO_MIN,
@@ -89,11 +99,21 @@ data class Ajustes(
     /** o fora mínimo da sacudida de sair, em rad/s; 0 = sem calibrar, vale o padrão (o do HinaWatch, [Sacudida.FORA_MIN]) */
     val sairFora: Float = 0f,
 ) {
-    /** A ação de [n] toques (1 a 4). */
+    /** A ação de [n] toques curtos (1 a 4). */
     fun toque(n: Int): AcaoToque = toques.getOrNull(n - 1) ?: AcaoToque.NADA
 
-    /** O maior número de toques que faz algo: chegou nele, não precisa esperar outro. */
-    fun maisToques(): Int = (toques.size downTo 1).firstOrNull { toque(it) != AcaoToque.NADA } ?: 0
+    /** A ação de [n] toques com o último segurado (1 a 4). */
+    fun segura(n: Int): AcaoToque = segurar.getOrNull(n - 1) ?: AcaoToque.NADA
+
+    /**
+     * O maior número de toques que faz algo, curtos ou com o último segurado:
+     * chegou nele, não precisa esperar outro.
+     */
+    fun maisToques(): Int =
+        (maxOf(toques.size, segurar.size) downTo 1).firstOrNull { toque(it) != AcaoToque.NADA || segura(it) != AcaoToque.NADA } ?: 0
+
+    /** A instância em que o orbe da [skin] ficou. */
+    fun instanciaDe(skin: Skin): Int = instancias[skin.id] ?: 0
 
     /** A escala do orbe da [skin]. */
     fun tamanhoDe(skin: Skin): Float = tamanhos[skin.id] ?: tamanho
@@ -107,7 +127,7 @@ data class Ajustes(
     /** O que vai e volta com o PC (a [Sincronia]). */
     fun sincronia() = Sincronia(
         t, agentes, voz, vozPc, microfone, vibrar, texto, glitch, linhas, tamanho, seguirPc, tamanhos,
-        toques = toques.map { it.id }, live = live, fundo = fundo, ordem = skins().map { it.id },
+        toques = toques.map { it.id }, segurar = segurar.map { it.id }, live = live, fundo = fundo, ordem = skins().map { it.id },
         sacudida = sacudida, sair = sair, sacudidaFora = sacudidaFora, sacudidaDentro = sacudidaDentro, sairFora = sairFora,
         etapas = etapas, idiomaEtapas = idiomaEtapas,
     )
@@ -118,7 +138,8 @@ data class Ajustes(
         // o PC manda null no orbe que ainda segue o tamanho comum
         tamanhos = s.tamanhos.mapNotNull { (k, v) -> v?.let { k to it.coerceIn(TAMANHO_MIN, TAMANHO_MAX) } }.toMap(),
         // o que o PC ainda não conhece (null) fica como está aqui
-        toques = s.toques?.let { l -> List(AcaoToque.PADRAO.size) { i -> AcaoToque.de(l.getOrNull(i)) ?: toques.getOrNull(i) ?: AcaoToque.NADA } } ?: toques,
+        toques = s.toques?.let { l -> lista(l, toques, AcaoToque.CURTAS) } ?: toques,
+        segurar = s.segurar?.let { l -> lista(l, segurar, AcaoToque.entries) } ?: segurar,
         live = s.live ?: live,
         fundo = s.fundo ?: fundo,
         ordem = s.ordem ?: ordem,
@@ -132,6 +153,10 @@ data class Ajustes(
     )
 
     companion object {
+        /** As ações que vêm do PC: a que não se reconhece (ou não cabe ali) fica como estava. */
+        private fun lista(l: List<String>, antes: List<AcaoToque>, validas: List<AcaoToque>) =
+            List(AcaoToque.PADRAO.size) { i -> AcaoToque.de(l.getOrNull(i))?.takeIf { it in validas } ?: antes.getOrNull(i) ?: AcaoToque.NADA }
+
         const val TAMANHO_MIN = 0.6f
         const val TAMANHO_MAX = 1.3f
         /** "pt": traduzidas para o português; "original": como o agente escreve */
@@ -148,6 +173,7 @@ class Cofre(private val ctx: Context) {
         val seguirPc = booleanPreferencesKey("seguir_pc")
         val skin = stringPreferencesKey("skin")
         val instancia = intPreferencesKey("instancia")
+        val instancias = stringPreferencesKey("instancias")  // "skin=1;skin=0"
         val fundo = booleanPreferencesKey("fundo")
         val glitch = booleanPreferencesKey("glitch")
         val linhas = booleanPreferencesKey("linhas")
@@ -167,6 +193,7 @@ class Cofre(private val ctx: Context) {
         val sacudida = booleanPreferencesKey("sacudida")
         val live = booleanPreferencesKey("live")
         val toques = stringPreferencesKey("toques")        // "abrir,live,encerrar,nada"
+        val segurar = stringPreferencesKey("segurar")      // "falar,historico,nada,nada"
         val historico = booleanPreferencesKey("historico")  // a chave antiga dos quatro toques
         val sacudidaFora = floatPreferencesKey("sacudida_fora")
         val sacudidaDentro = floatPreferencesKey("sacudida_dentro")
@@ -183,9 +210,20 @@ class Cofre(private val ctx: Context) {
     /** Sem a lista guardada, o padrão; com a chave antiga ligada, quatro toques abrem o histórico. */
     private fun lerToques(s: String?, historico: Boolean): List<AcaoToque> {
         if (s == null) return if (historico) AcaoToque.PADRAO.dropLast(1) + AcaoToque.HISTORICO else AcaoToque.PADRAO
-        val l = s.split(',')
-        return List(AcaoToque.PADRAO.size) { i -> AcaoToque.de(l.getOrNull(i)) ?: AcaoToque.PADRAO[i] }
+        return lerAcoes(s, AcaoToque.PADRAO)
     }
+
+    private fun lerAcoes(s: String, padrao: List<AcaoToque>): List<AcaoToque> {
+        val l = s.split(',')
+        return List(padrao.size) { i -> AcaoToque.de(l.getOrNull(i)) ?: padrao[i] }
+    }
+
+    private fun lerInstancias(s: String?): Map<String, Int> =
+        s.orEmpty().split(';').mapNotNull { par ->
+            val p = par.split('=', limit = 2)
+            val k = p.getOrNull(1)?.toIntOrNull() ?: return@mapNotNull null
+            p[0].takeIf { it.isNotEmpty() }?.let { it to k.coerceAtLeast(0) }
+        }.toMap()
 
     private fun lerTamanhos(s: String?): Map<String, Float> =
         s.orEmpty().split(';').mapNotNull { par ->
@@ -202,6 +240,7 @@ class Cofre(private val ctx: Context) {
             seguirPc = p[K.seguirPc] ?: d.seguirPc,
             skin = p[K.skin] ?: d.skin,
             instancia = p[K.instancia] ?: d.instancia,
+            instancias = lerInstancias(p[K.instancias]),
             fundo = p[K.fundo] ?: d.fundo,
             glitch = p[K.glitch] ?: d.glitch,
             linhas = p[K.linhas] ?: d.linhas,
@@ -221,6 +260,7 @@ class Cofre(private val ctx: Context) {
             sacudida = p[K.sacudida] ?: d.sacudida,
             live = p[K.live] ?: d.live,
             toques = lerToques(p[K.toques], p[K.historico] == true),
+            segurar = p[K.segurar]?.let { lerAcoes(it, AcaoToque.PADRAO_SEGURAR) } ?: d.segurar,
             sacudidaFora = p[K.sacudidaFora] ?: d.sacudidaFora,
             sacudidaDentro = p[K.sacudidaDentro] ?: d.sacudidaDentro,
             ordem = p[K.ordem].orEmpty().split(',').filter { it.isNotEmpty() },
@@ -236,6 +276,7 @@ class Cofre(private val ctx: Context) {
             p[K.seguirPc] = a.seguirPc
             p[K.skin] = a.skin
             p[K.instancia] = a.instancia
+            p[K.instancias] = a.instancias.entries.joinToString(";") { "${it.key}=${it.value}" }
             p[K.fundo] = a.fundo
             p[K.glitch] = a.glitch
             p[K.linhas] = a.linhas
@@ -255,6 +296,7 @@ class Cofre(private val ctx: Context) {
             p[K.sacudida] = a.sacudida
             p[K.live] = a.live
             p[K.toques] = a.toques.joinToString(",") { it.id }
+            p[K.segurar] = a.segurar.joinToString(",") { it.id }
             p.remove(K.historico)
             p[K.sacudidaFora] = a.sacudidaFora
             p[K.sacudidaDentro] = a.sacudidaDentro

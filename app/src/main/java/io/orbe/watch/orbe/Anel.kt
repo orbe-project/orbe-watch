@@ -1,5 +1,6 @@
 package io.orbe.watch.orbe
 
+import io.orbe.watch.orbe.Estado.IDLE
 import io.orbe.watch.orbe.Estado.LISTENING
 import io.orbe.watch.orbe.Estado.SPEAKING
 import io.orbe.watch.orbe.Estado.THINKING
@@ -44,6 +45,15 @@ class Anel : Arte {
     private val nW = 36
     private val nLingua = 10
     private val nGota = 7
+    // os nomes dos uniforms por índice, montados uma vez: o quadro não aloca string
+    private val nomesCampo = Array(9) { "campo$it" }
+    private val nomesLingua = Array(nLingua) { "lingua$it" }
+    private val nomesCirculo = Array(nLingua) { "linguaC[$it]" }
+    private val nomesVertices = Array(nLingua * 8) { "linguaV[$it]" }
+    // os 4 pontos e os 16 vértices da chama de uma língua, para o círculo dela
+    private val ptX = DoubleArray(4)
+    private val ptY = DoubleArray(4)
+    private val nomesGota = Array(nGota) { "gota$it" }
     private val nQuadros = 62
 
     // ── paleta: accent do tema derivado por HSV, como no _system_palette ──
@@ -120,6 +130,7 @@ class Anel : Arte {
     private var glShear = 0.0
     private var glDx = 0.0
     private val glBands = ArrayList<DoubleArray>()   // (y0, altura, deslocamento)
+    private var glRepouso = false                     // a rajada é a fraca do orbe parado
     private val dE = DoubleArray(nGota)
     private val dAng = DoubleArray(nGota)
     private val dDist = DoubleArray(nGota)
@@ -259,22 +270,20 @@ class Anel : Arte {
             tH[j] = lim(tH[j] + tV[j] * dt, -3.0, 16.0)
         }
 
-        // glitch do pensamento: rajadas curtas e irregulares, mais densas no fundo do raciocínio
+        // glitch do pensamento: rajadas curtas e irregulares, mais densas no fundo do raciocínio;
+        // em repouso, um resto dele: raras, fracas (GL_REPOUSO), sem salto de quadro
         val wt = mix[THINKING]
         if (wt > 0.25 && glitch) {
             if (t >= glProx) {
                 glAte = t + uni(0.05, 0.20)
                 glProx = glAte + uni(0.06, 0.75) / (0.4 + wt)
-                glLo = sorteia(nW)
-                glSpan = 2 + sorteia(max(3, nW / 3) - 1)
-                glAmp = uni(5.0, 15.0) * (if (Random.nextDouble() < 0.5) -1 else 1)
-                glShear = uni(-0.09, 0.09)
-                glJump = if (Random.nextDouble() < 0.34) 1 + sorteia(nQuadros - 1) else 0
-                glDx = if (Random.nextDouble() < 0.75) uni(1.6, 5.5) else 0.0
-                glBands.clear()
-                repeat(sorteia(5)) {
-                    glBands.add(doubleArrayOf(uni(-46.0, 40.0), uni(2.0, 9.0), uni(5.0, 20.0) * (if (Random.nextDouble() < 0.5) -1 else 1)))
-                }
+                sortearRajada(repouso = false)
+            }
+        } else if (mix[IDLE] > 0.5 && glitch) {
+            if (t >= glProx) {
+                glAte = t + uni(0.05, 0.15)
+                glProx = glAte + uni(1.5, 4.5)
+                sortearRajada(repouso = true)
             }
         } else {
             glAte = 0.0
@@ -290,7 +299,69 @@ class Anel : Arte {
         }
     }
 
+    /** A forma de uma rajada de glitch; [repouso]: a fraca do orbe parado (Anel.qml). */
+    private fun sortearRajada(repouso: Boolean) {
+        glRepouso = repouso
+        glLo = sorteia(nW)
+        glSpan = 2 + sorteia(max(3, nW / 3) - 1)
+        glAmp = uni(5.0, 15.0) * (if (Random.nextDouble() < 0.5) -1 else 1)
+        glShear = uni(-0.09, 0.09)
+        glJump = if (!repouso && Random.nextDouble() < 0.34) 1 + sorteia(nQuadros - 1) else 0
+        glDx = if (Random.nextDouble() < 0.75) uni(1.6, 5.5) else 0.0
+        glBands.clear()
+        repeat(sorteia(if (repouso) 2 else 5)) {
+            glBands.add(doubleArrayOf(uni(-46.0, 40.0), uni(2.0, 9.0), uni(5.0, 20.0) * (if (Random.nextDouble() < 0.5) -1 else 1)))
+        }
+    }
+
+    /**
+     * O círculo que contém a chama da língua [j] como o anel.frag a desenha (a
+     * catmull-rom fechada pelos 4 pontos, em 16 lados), mais o halo de 2,5*esc e
+     * a folga do antisserrilhado: fora dele a língua não deixa nada, e o shader a
+     * pula. Os pontos são as contas do sdLingua, aqui uma vez por quadro.
+     */
+    private fun circuloLingua(j: Int, a: Double, rb: Double, ponta: Double, wj: Double, esc: Double) {
+        val lean = 0.10 * sin(t * 2.3 + j)
+        ptX[0] = cos(a - wj * 0.85) * rb * 0.98; ptY[0] = sin(a - wj * 0.85) * rb * 0.98
+        ptX[1] = cos(a + lean) * ponta; ptY[1] = sin(a + lean) * ponta
+        ptX[2] = cos(a + wj * 0.85) * rb * 0.98; ptY[2] = sin(a + wj * 0.85) * rb * 0.98
+        ptX[3] = cos(a) * rb * 0.90; ptY[3] = sin(a) * rb * 0.90
+        var x0 = Double.MAX_VALUE; var x1 = -Double.MAX_VALUE
+        var y0 = Double.MAX_VALUE; var y1 = -Double.MAX_VALUE
+        for (i in 0 until 4) {
+            val i0 = (i + 3) % 4; val i2 = (i + 1) % 4; val i3 = (i + 2) % 4
+            val c1x = ptX[i] + (ptX[i2] - ptX[i0]) / 6; val c1y = ptY[i] + (ptY[i2] - ptY[i0]) / 6
+            val c2x = ptX[i2] - (ptX[i3] - ptX[i]) / 6; val c2y = ptY[i2] - (ptY[i3] - ptY[i]) / 6
+            for (k in 0 until 4) {
+                val s = k / 4.0
+                val u = 1 - s
+                val vx = u * u * u * ptX[i] + 3 * u * u * s * c1x + 3 * u * s * s * c2x + s * s * s * ptX[i2]
+                val vy = u * u * u * ptY[i] + 3 * u * u * s * c1y + 3 * u * s * s * c2y + s * s * s * ptY[i2]
+                vertX[i * 4 + k] = vx; vertY[i * 4 + k] = vy
+                x0 = min(x0, vx); x1 = max(x1, vx); y0 = min(y0, vy); y1 = max(y1, vy)
+            }
+        }
+        val cx = (x0 + x1) / 2
+        val cy = (y0 + y1) / 2
+        var r2 = 0.0
+        for (v in 0 until 16) {
+            val dx = vertX[v] - cx
+            val dy = vertY[v] - cy
+            r2 = max(r2, dx * dx + dy * dy)
+        }
+        val r = kotlin.math.sqrt(r2) + 2.5 * esc + FOLGA_LINGUA
+        fx.v4(nomesCirculo[j], cx, cy, r * r, 0.0)
+        for (m in 0 until 8) {
+            fx.v4(nomesVertices[j * 8 + m], vertX[2 * m], vertY[2 * m], vertX[2 * m + 1], vertY[2 * m + 1])
+        }
+    }
+    private val vertX = DoubleArray(16)
+    private val vertY = DoubleArray(16)
+
     private val campos = DoubleArray(nW)
+    private var semLinguas = true
+    override val variante: Map<String, Int> get() = if (semLinguas) SEM_LINGUAS else emptyMap()
+    override val outraVariante: Map<String, Int> get() = if (semLinguas) emptyMap() else SEM_LINGUAS
 
     override fun montar(w: Double, h: Double, cx: Double, cy: Double, cw: Double, ch: Double) {
         if (!temPb) return
@@ -307,7 +378,7 @@ class Anel : Arte {
         val scb = (artBox / 256) * envEsc * pulse * esc
 
         val rajada = t < glAte
-        val glk = if (rajada) mix[THINKING] else 0.0
+        val glk = if (!rajada) 0.0 else if (glRepouso) GL_REPOUSO * mix[IDLE] else mix[THINKING]
         var idx = floor(framePos).toInt() % nQuadros
         if (glk > 0 && glJump != 0) idx = (idx + glJump) % nQuadros
 
@@ -323,7 +394,7 @@ class Anel : Arte {
         }
         for (i in 0 until nW) fmax = max(fmax, abs(campos[i]))
         for (i in 0 until 9) {
-            fx.v4("campo$i", lim(1 + campos[4 * i] / 50, 0.84, 1.28), lim(1 + campos[4 * i + 1] / 50, 0.84, 1.28),
+            fx.v4(nomesCampo[i], lim(1 + campos[4 * i] / 50, 0.84, 1.28), lim(1 + campos[4 * i + 1] / 50, 0.84, 1.28),
                 lim(1 + campos[4 * i + 2] / 50, 0.84, 1.28), lim(1 + campos[4 * i + 3] / 50, 0.84, 1.28))
         }
 
@@ -342,20 +413,26 @@ class Anel : Arte {
         for (j in 0 until nLingua) {
             val hj = tH[j]
             if (hj < 1.2) {
-                fx.zero4("lingua$j")
+                fx.zero4(nomesLingua[j])
+                fx.v4(nomesCirculo[j], 0.0, 0.0, -1.0, 0.0)
                 continue
             }
             val a = tAng[j]
             val sa = lim(1 + campo(a) / 50, 0.84, 1.28)
             val rb = artEdge * scb * sa * 0.94
-            fx.v4("lingua$j", a, rb, min(rLim * esc, rb + hj * 2 * esc), tW[j])
+            val ponta = min(rLim * esc, rb + hj * 2 * esc)
+            fx.v4(nomesLingua[j], a, rb, ponta, tW[j])
+            circuloLingua(j, a, rb, ponta, tW[j], esc)
             ate = j + 1
         }
         fx.v1("nLingua", ate.toDouble())
+        // sem língua acesa (o anel parado), o shader sem o laço delas: o mesmo
+        // desenho, e o laço compilado, mesmo sem rodar, custava ~22 ms por quadro
+        semLinguas = ate == 0
         for (d in 0 until nGota) {
             val e = dE[d]
-            if (e <= 0.04) fx.zero4("gota$d")
-            else fx.v4("gota$d", cos(dAng[d]) * dDist[d] * esc, sin(dAng[d]) * dDist[d] * esc, e, 0.0)
+            if (e <= 0.04) fx.zero4(nomesGota[d])
+            else fx.v4(nomesGota[d], cos(dAng[d]) * dDist[d] * esc, sin(dAng[d]) * dDist[d] * esc, e, 0.0)
         }
 
         // segundo passe
@@ -376,3 +453,15 @@ class Anel : Arte {
         }
     }
 }
+
+/** a força da rajada de glitch do anel em repouso, perto da de pensando (até 1) */
+private const val GL_REPOUSO = 0.3
+
+/**
+ * a folga do círculo das línguas além do halo, em px lógicos: cobre o
+ * antisserrilhado (meio fwidth, até a máscara mais baixa) e a conta em float da GPU
+ */
+private const val FOLGA_LINGUA = 3.0
+
+/** a variante do anel.frag sem o laço das línguas, para os quadros sem nenhuma acesa */
+private val SEM_LINGUAS = mapOf("SEM_LINGUAS" to 1)

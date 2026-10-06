@@ -47,6 +47,7 @@ import kotlin.math.sqrt
 internal object Motor {
     private const val INTERVALO_NS = 30_000_000L          // um quadro sim, um não, num painel de 60 Hz
     private const val INTERVALO_CALMO_NS = 46_000_000L    // um em três: o orbe à espera gasta menos bateria
+    private const val ESPERA_GPU_NS = 250_000_000L         // o teto da espera pela GPU antes de entregar o quadro
     // Miniaturas desenhadas por quadro, em rodízio. Medido no TicWatch Pro 5: com
     // as cinco do menu no mesmo quadro, a GPU ficava ocupada de uma vez só e a
     // rolagem da tela perdia quadros (90% deles acima de 150 ms).
@@ -479,7 +480,24 @@ internal object Motor {
         val arte = a.view.cena.passo(dt, wl, hl)
         if (a.view.adaptar) skinGrande = arte.skin
         pintar(a.m, arte, 0, a.w, a.h, wl, hl, if (a.view.adaptar) qualidade else 1f, a.view.adaptar)
+        esperarGpu()
         EGL14.eglSwapBuffers(tela, a.egl)
+    }
+
+    /**
+     * Só vai para a TextureView um quadro que a GPU já terminou. A RenderThread,
+     * ao compor a tela, pega o quadro mais novo da fila e espera a cerca dele; com
+     * a GPU levando quase o intervalo inteiro (o anel, ~30 ms a cada 30 ms), chegava
+     * outro quadro inacabado durante a espera e ela corria atrás dele, e a tela
+     * parava (perfetto de 2026-10-06: 29 esperas num DrawFrame de 947 ms, com a
+     * orbe-gl em dia). Esperando aqui, o custo da GPU atrasa a orbe-gl, onde a
+     * qualidade da máscara ([avaliar]) o vê e se ajusta.
+     */
+    private fun esperarGpu() {
+        val cerca = GLES30.glFenceSync(GLES30.GL_SYNC_GPU_COMMANDS_COMPLETE, 0)
+        if (cerca == 0L) return
+        GLES30.glClientWaitSync(cerca, GLES30.GL_SYNC_FLUSH_COMMANDS_BIT, ESPERA_GPU_NS)
+        GLES30.glDeleteSync(cerca)
     }
 
     /**
@@ -491,7 +509,10 @@ internal object Motor {
     private fun pintar(m: Mascara, arte: Arte, saida: Int, w: Int, h: Int, wl: Double, hl: Double, q: Float, medir: Boolean) {
         val of = oficina ?: return
         val prim = of.primitivas(arte.skin)
-        val figura = prim ?: of.figura(arte.skin)        // sem primitivas nesta GPU, por pixel
+        val figura = prim ?: of.figura(arte.skin, arte.variante)        // sem primitivas nesta GPU, por pixel
+        // a outra variante (o anel com e sem as línguas) compila já no primeiro quadro da
+        // arte, na abertura: a primeira língua que acende não para o orbe (362 ms no Adreno 504)
+        if (prim == null) arte.outraVariante?.let { of.figura(arte.skin, it) }
         val pos = of.pos()
 
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, saida)

@@ -151,7 +151,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         ServicoSacudida.orbeNaFrente = false
-        vm.saiu()
+        vm.saiu(fechando = isFinishing)
         super.onStop()
     }
 

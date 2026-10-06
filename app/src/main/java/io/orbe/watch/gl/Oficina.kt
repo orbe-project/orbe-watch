@@ -73,8 +73,9 @@ internal class Oficina(private val ctx: Context) {
         tem
     }
 
-    /** Primeiro passe da skin; null se o shader não compila nesta GPU. */
-    fun figura(skin: Skin): Programa? = programa(skin.shader, skin.definicoes)
+    /** Primeiro passe da skin, na [variante] pedida pela arte; null se o shader não compila nesta GPU. */
+    fun figura(skin: Skin, variante: Map<String, Int> = emptyMap()): Programa? =
+        programa(skin.shader, if (variante.isEmpty()) skin.definicoes else skin.definicoes + variante)
 
     /**
      * O primeiro passe das skins desenhadas por elemento (o Ophanim): o próprio

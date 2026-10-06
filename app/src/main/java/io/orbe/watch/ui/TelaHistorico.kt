@@ -17,8 +17,8 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * O histórico de sessões do agente do orbe em tela, aberto por quatro toques
- * (com a opção na aba Ativação): escolher uma retoma a conversa no PC e o orbe
+ * O histórico de sessões do agente do orbe em tela, aberto pelos toques (no
+ * padrão, tocar e segurar; aba Ativação): escolher uma retoma a conversa no PC e o orbe
  * passa a falar com ela. O voltar do sistema fecha sem escolher.
  */
 @Composable

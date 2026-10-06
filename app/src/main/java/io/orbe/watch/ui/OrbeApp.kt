@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
+import io.orbe.watch.Aparencia
 import io.orbe.watch.OrbeViewModel
 import io.orbe.watch.dados.Ligacao
 import io.orbe.watch.gesto.Picos
@@ -95,9 +96,17 @@ fun OrbeApp(
         // sem o fundo atrás do orbe, ele acende junto com a entrada do menu
         FundoVidro(
             Modifier.graphicsLayer {
-                alpha = if (ajustes.fundo) 1f else (paginas.currentPage + paginas.currentPageOffsetFraction).coerceIn(0f, 1f)
+                alpha = if (aparencia.fundo) 1f else (paginas.currentPage + paginas.currentPageOffsetFraction).coerceIn(0f, 1f)
             },
         )
+        // com o fundo atrás do orbe, um véu o escurece na página dele e some na entrada do menu
+        if (aparencia.fundo) {
+            Box(
+                Modifier.fillMaxSize().graphicsLayer {
+                    alpha = Aparencia.ESCURO * (1 - (paginas.currentPage + paginas.currentPageOffsetFraction)).coerceIn(0f, 1f)
+                }.background(Color.Black),
+            )
+        }
         HorizontalPager(
             state = paginas,
             modifier = Modifier
