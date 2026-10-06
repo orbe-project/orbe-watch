@@ -264,8 +264,8 @@ class Figura(skinInicial: Skin) : Arte {
         if (!humana) {
             // os raios fluem presos ao olho: a ondulação corre do olho para fora,
             // com a amplitude numa mola que cada sílaba chuta
-            val alvoA = mistura(3.0, 2.0, 5.0, 3.5, 4.0) + 6 * falar - 3 * (1 - dG)
-            if (chute > 0) pc.vamp += chute * 25
+            val alvoA = mistura(2.0, 1.5, 3.5, 2.5, 3.0) + 3 * falar - 2 * (1 - dG)
+            if (chute > 0) pc.vamp += chute * 12
             pc.vamp += (30 * (alvoA - pc.amp) - 7 * pc.vamp) * dt
             pc.amp = max(0.0, pc.amp + pc.vamp * dt)
             pc.fluxo += dt * (mistura(1.4, 1.0, 2.6, 3.6, 2.0) + 1.5 * falar)
