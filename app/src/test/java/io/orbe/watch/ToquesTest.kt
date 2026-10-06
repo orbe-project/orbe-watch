@@ -4,6 +4,7 @@ import io.orbe.watch.dados.AcaoToque
 import io.orbe.watch.dados.Ajustes
 import io.orbe.watch.dados.Sincronia
 import io.orbe.watch.gesto.Sacudida
+import io.orbe.watch.orbe.Skin
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -62,6 +63,6 @@ class ToquesTest {
         assertEquals(listOf("abrir", "live", "encerrar", "nada"), s.toques)
         assertEquals(true, s.live)
         assertEquals(false, s.sacudida)
-        assertEquals(4, s.ordem?.size)
+        assertEquals(Skin.entries.size, s.ordem?.size)
     }
 }

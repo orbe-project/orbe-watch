@@ -25,7 +25,9 @@ enum class Skin(
     ANEL("anel", "Anel de energia", "anel.frag", emptyMap(), "anel_atlas.png", floatArrayOf(1f, 1f, 1f), 0.35f, 0.412f),
     SERAFIM_GRAVURA("serafim_gravura", "Seraphim (gravura)", "imagem.frag", mapOf("IMG" to 1), "serafim_gravura.png", floatArrayOf(1.15f, 1.3f, 1.4f), 0.38f, 0.355f),
     OFANIM("ofanim", "Ophanim", "figura.frag", mapOf("SKIN" to 0), null, floatArrayOf(1.55f, 1.55f, 1.25f), 0.39f, 0.345f),
-    OFANIM_ALADO("ofanim_alado", "Ophanim com asas", "figura.frag", mapOf("SKIN" to 1), null, floatArrayOf(2.1f, 1.55f, 2.08f), 0.29f, 0.277f);
+    OFANIM_ALADO("ofanim_alado", "Ophanim com asas", "figura.frag", mapOf("SKIN" to 1), null, floatArrayOf(2.1f, 1.55f, 2.08f), 0.29f, 0.277f),
+    OLHO("olho", "Olho", "imagem.frag", mapOf("IMG" to 2), "olho.png", floatArrayOf(1.1f, 1.36f, 1.36f), 0.46f, 0.38f),
+    HUMANA("humana", "Humana", "imagem.frag", mapOf("IMG" to 3), "humana.png", floatArrayOf(1.18f, 1.13f, 1.27f), 0.43f, 0.40f);
 
     /**
      * No mostrador redondo a figura cabe no disco, e algumas saem menores que
@@ -41,7 +43,9 @@ enum class Skin(
     val avatar: Boolean get() = this != ANEL
     /** No relógio, desenhada por elemento (as primitivas do figura.frag), não por pixel. */
     val primitivas: Boolean get() = this == OFANIM || this == OFANIM_ALADO
-    val imagem: Boolean get() = this == SERAFIM_GRAVURA
+    val imagem: Boolean get() = shader == "imagem.frag"
+    /** De imagem, numa célula só deformada em volta de um polo (ver imagem.frag). */
+    val polar: Boolean get() = this == OLHO || this == HUMANA
 
     companion object {
         /**
