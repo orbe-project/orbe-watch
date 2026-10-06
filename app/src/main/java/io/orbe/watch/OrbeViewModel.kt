@@ -174,7 +174,7 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun aparenciaDe(a: Ajustes): Aparencia {
         val pc = a.pc.takeIf { it.isNotEmpty() }?.let(Protocolo::ola)
-        val tema = pc?.let { Tema.de(it.tema, it.papel) } ?: Tema.Padrao
+        val tema = pc?.let { Tema.de(it.tema, it.papel, Tema.imagemDoFundo(it.papelId, it.papelImagem)) } ?: Tema.Padrao
         val skin = Skin.de(if (a.seguirPc && pc != null) pc.orbe.skin else a.skin)
         val instancia = if (temInstancias(agenteDe(skin, a))) a.instancia.coerceAtLeast(0) else 0
         return if (a.seguirPc && pc != null) Aparencia(skin, pc.orbe.glitch, pc.orbe.glitch, tema, instancia, a.fundo)   // no PC as linhas vêm com o glitch

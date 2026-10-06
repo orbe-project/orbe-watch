@@ -1,10 +1,13 @@
 package io.orbe.watch.ui
 
+import android.graphics.BitmapFactory
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -26,6 +29,8 @@ data class Tema(
     val anel: Color,
     /** o papel de parede do PC em n x n cores, para o fundo; vazio sem ele */
     val papel: List<Color> = emptyList(),
+    /** a imagem escolhida no app do PC para o fundo; com ela, o [papel] não entra */
+    val imagem: ImageBitmap? = null,
 ) {
     companion object {
         val Padrao = Tema(
@@ -35,7 +40,7 @@ data class Tema(
         )
 
         /** Do mapa da ponte (accent_bg_color, window_bg_color, ...); o que faltar fica no padrão. */
-        fun de(m: Map<String, String>, papel: List<String> = emptyList()): Tema = Tema(
+        fun de(m: Map<String, String>, papel: List<String> = emptyList(), imagem: ImageBitmap? = null): Tema = Tema(
             accent = cor(m["accent_bg_color"]) ?: Padrao.accent,
             accentFg = cor(m["accent_fg_color"]) ?: Padrao.accentFg,
             fundo = cor(m["window_bg_color"]) ?: Padrao.fundo,
@@ -44,7 +49,27 @@ data class Tema(
             popover = cor(m["popover_bg_color"]) ?: Padrao.popover,
             anel = cor(m["anel"]) ?: Padrao.anel,
             papel = papel.mapNotNull(::cor).takeIf { lado(it.size) > 1 }.orEmpty(),
+            imagem = imagem,
         )
+
+        private var imagemGuardada: Pair<String, ImageBitmap?> = "" to null
+
+        /**
+         * A imagem do fundo mandada pela ponte (JPEG em base64), decodificada uma
+         * vez por [id]: os ajustes passam por aqui a cada mudança.
+         */
+        fun imagemDoFundo(id: String, base64: String): ImageBitmap? {
+            if (base64.isEmpty()) return null
+            imagemGuardada.takeIf { it.first == id && id.isNotEmpty() }?.let { return it.second }
+            val img = try {
+                val bytes = java.util.Base64.getDecoder().decode(base64)
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            } catch (e: IllegalArgumentException) {
+                null
+            }
+            imagemGuardada = id to img
+            return img
+        }
 
         /** O lado do quadrado de [n] cores, ou 0 se [n] não é quadrado. */
         fun lado(n: Int): Int {
