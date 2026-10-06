@@ -124,6 +124,8 @@ private val ARREMESSO = 400.dp
 private val BORDA_ROTULO = 6.dp
 /** as miniaturas das instâncias ativas, no pé */
 private val LADO_INSTANCIA = 14.dp
+/** a do orbe que espera a vez de falar, no canto de baixo à direita */
+private val LADO_ESPERA = 26.dp
 private const val ARCO_TITULO = 150f
 private const val ARCO_ROTULO = 100f
 
@@ -267,6 +269,20 @@ fun TelaOrbe(
         }
         // por cima da tela, sem tirar largura dos orbes (o scaffold do Wear reservava uma faixa e os tirava do centro)
         PontosDaLista(nSkins, { paginas.currentPage + paginas.currentPageOffsetFraction }, Modifier.align(Alignment.CenterEnd).padding(end = 2.dp))
+
+        // ── o orbe que quer falar e espera a vez: em miniatura, parado, na diagonal de baixo à direita ──
+        val esperas by vm.esperas.collectAsStateWithLifecycle()
+        esperas.firstOrNull()?.let { e ->
+            val skinE = Skin.entries.firstOrNull { it.id == e.skin } ?: return@let
+            val corE = runCatching { Color(android.graphics.Color.parseColor(e.cor)) }.getOrNull() ?: aparencia.tema.accent
+            val chave = ChavePrevia(
+                Papel.INSTANCIA, skinE, LADO_ESPERA, LADO_ESPERA, glitch = false, linhas = false,
+                corE, aparencia.tema.anel, aparencia.tema.fundo,
+            )
+            // por dentro do mostrador redondo: a 45° do centro
+            val r = min(w, h) / 2 * 0.66f * 0.7071f
+            Miniatura(chave, Modifier.align(Alignment.Center).offset(x = r.dp, y = r.dp).size(LADO_ESPERA))
+        }
 
         // ── o raciocínio: as últimas fileiras, a mais nova embaixo ──
         // o texto espera a figura subir antes de aparecer embaixo dela

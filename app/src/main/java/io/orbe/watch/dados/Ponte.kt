@@ -57,6 +57,10 @@ class Ponte(
     private val aoSessoes: (List<SessaoInfo>) -> Unit = {},
     /** as sessões passadas do agente do orbe em tela, pedidas com "historico" */
     private val aoHistorico: (Historico) -> Unit = {},
+    /** um orbe em segundo plano tomou a vez de falar */
+    private val aoFoco: (Foco) -> Unit = {},
+    /** os orbes cuja resposta espera a vez */
+    private val aoEsperas: (List<Espera>) -> Unit = {},
 ) {
     private val cliente = OkHttpClient.Builder()
         .connectTimeout(6, TimeUnit.SECONDS)
@@ -135,6 +139,8 @@ class Ponte(
                     text.startsWith("ajustes ") -> if (conectou) Protocolo.sincronia(text.substring(8))?.let(aoAjustes)
                     text.startsWith("sessoes ") -> if (conectou) Protocolo.sessoes(text.substring(8))?.let(aoSessoes)
                     text.startsWith("historico ") -> if (conectou) Protocolo.historico(text.substring(10))?.let(aoHistorico)
+                    text.startsWith("foco ") -> if (conectou) Protocolo.foco(text.substring(5))?.let(aoFoco)
+                    text.startsWith("espera ") -> if (conectou) Protocolo.esperas(text.substring(7))?.let(aoEsperas)
                     conectou -> aoLinha(text)
                 }
             }

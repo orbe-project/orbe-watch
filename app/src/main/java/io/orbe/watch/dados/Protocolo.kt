@@ -67,6 +67,17 @@ data class SessaoInfo(
     val ouve: Boolean = false,
 )
 
+/**
+ * Orbes em paralelo: a resposta de um orbe que estava em segundo plano tomou a
+ * vez de falar ("foco"): o relógio rola até ele, na instância da [vaga].
+ */
+@Serializable
+data class Foco(val skin: String = "", val agente: String = "", val vaga: Int = -1)
+
+/** Um orbe cuja resposta espera a vez de falar ("espera", na ordem de chegada). */
+@Serializable
+data class Espera(val skin: String = "", val vaga: Int = -1, val cor: String = "")
+
 /** Uma sessão passada de um agente, para retomar ("historico" da ponte). */
 @Serializable
 data class SessaoPassada(
@@ -155,6 +166,20 @@ object Protocolo {
     /** O "sessoes [...]" da ponte. */
     fun sessoes(texto: String): List<SessaoInfo>? = try {
         json.decodeFromString(ListSerializer(SessaoInfo.serializer()), texto)
+    } catch (e: Exception) {
+        null
+    }
+
+    /** O "foco {...}" da ponte. */
+    fun foco(texto: String): Foco? = try {
+        json.decodeFromString(Foco.serializer(), texto)
+    } catch (e: Exception) {
+        null
+    }
+
+    /** O "espera [...]" da ponte. */
+    fun esperas(texto: String): List<Espera>? = try {
+        json.decodeFromString(ListSerializer(Espera.serializer()), texto)
     } catch (e: Exception) {
         null
     }

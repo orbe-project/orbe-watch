@@ -11,6 +11,8 @@ import io.orbe.watch.dados.AgenteInfo
 import io.orbe.watch.dados.Ajustes
 import io.orbe.watch.dados.AltoFalante
 import io.orbe.watch.dados.Cofre
+import io.orbe.watch.dados.Espera
+import io.orbe.watch.dados.Foco
 import io.orbe.watch.dados.Historico
 import io.orbe.watch.dados.Ligacao
 import io.orbe.watch.dados.Microfone
@@ -123,6 +125,8 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
         aoAjustes = ::ajustesDaPonte,
         aoSessoes = { _sessoes.value = it },
         aoHistorico = { h -> if (_historico.value != null) _historico.value = h },
+        aoFoco = ::focoDaPonte,
+        aoEsperas = { _esperas.value = it },
     )
     val ligacao: StateFlow<Ligacao> = ponte.estado
     /** a ponte em casa vai pelo Wi-Fi do relógio, não pelo celular */
@@ -303,6 +307,24 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
     fun instancia(k: Int, skin: Skin = aparencia.value.skin) = mudar {
         val i = k.coerceAtLeast(0)
         it.copy(instancia = i, instancias = it.instancias + (skin.id to i))
+    }
+
+    /** os orbes cuja resposta espera a vez de falar, na ordem (o primeiro aparece no canto) */
+    private val _esperas = MutableStateFlow<List<Espera>>(emptyList())
+    val esperas: StateFlow<List<Espera>> = _esperas
+
+    /**
+     * A resposta de um orbe em segundo plano tomou a vez: o relógio passa a ele,
+     * na instância da vaga dele, e vem para a frente (não por cima da Hina).
+     */
+    private fun focoDaPonte(f: Foco) {
+        val skin = Skin.entries.firstOrNull { it.id == f.skin } ?: return
+        val a = _ajustes.value
+        val grupo = skinsDoAgente(agenteDe(skin, a), a)
+        val k = if (f.vaga >= 0 && grupo.isNotEmpty()) f.vaga / grupo.size else 0
+        if (a.seguirPc) mudarSinc { it.copy(seguirPc = false, skin = skin.id, instancia = k, glitch = aparencia.value.glitch, linhas = aparencia.value.linhas) }
+        else mudar { it.copy(skin = skin.id, instancia = k) }
+        if (!naTela) ServicoEspera.trazer(getApplication())
     }
 
     /** O fundo do menu atrás dos orbes. */

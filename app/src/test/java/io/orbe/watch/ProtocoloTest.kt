@@ -56,4 +56,15 @@ class ProtocoloTest {
         assertEquals("original", aqui.com(Protocolo.sincronia("""{"t": 6, "etapas": true, "idioma_etapas": "klingon"}""")!!).idiomaEtapas)
         assertTrue(Protocolo.ajustes(aqui.sincronia()).contains("\"idioma_etapas\":\"original\""))
     }
+
+    @Test
+    fun focoEEsperaDosOrbesEmParalelo() {
+        val f = Protocolo.foco("""{"skin": "ofanim_alado", "agente": "claude", "vaga": 7}""")!!
+        assertEquals("ofanim_alado", f.skin)
+        assertEquals(7, f.vaga)
+        val e = Protocolo.esperas("""[{"skin": "ofanim", "vaga": 3, "cor": "#4DD0E1"}, {"skin": "anel", "vaga": -1, "cor": ""}]""")!!
+        assertEquals(listOf("ofanim", "anel"), e.map { it.skin })
+        assertEquals("#4DD0E1", e[0].cor)
+        assertEquals(emptyList<Any>(), Protocolo.esperas("[]"))
+    }
 }
