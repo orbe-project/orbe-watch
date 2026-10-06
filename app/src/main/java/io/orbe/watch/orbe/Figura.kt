@@ -77,14 +77,38 @@ class Figura(skinInicial: Skin) : Arte {
         var faseAsa = 0.0
         var abreAsa = 0.2
         var ampAsa = 0.0
-        // olho e humana: as 16 molas em volta do polo
-        val campo = DoubleArray(16)
-        val vcampo = DoubleArray(16)
-        val semCampo = DoubleArray(16) { uni(0.0, 100.0) }
-        var giro = 0.0
-        var torcao = 0.0
-        var tremor = 0.0
+        // olho e humana: as molas das peças (criadas na primeira vez) e a pupila que encara
+        var pc: Partes? = null
         var encarar = 0.0
+    }
+
+    /**
+     * As molas das peças da Humana e do Olho (imagem.frag): uma cadeia por
+     * membro ou raio, com [juntas] ângulos cada, e os corpos da Humana.
+     */
+    private class Partes(val cadeias: Int, val juntas: Int, val corpos: Int) {
+        val ang = Array(cadeias) { DoubleArray(3) }
+        val vel = Array(cadeias) { DoubleArray(3) }
+        val fase = DoubleArray(cadeias) { uni(0.0, TAU) }
+        val sinal = DoubleArray(cadeias) { if (Random.nextBoolean()) 1.0 else -1.0 }
+        val sem = DoubleArray(cadeias) { uni(0.0, 100.0) }
+        val est = DoubleArray(cadeias)
+        val vest = DoubleArray(cadeias)
+        val corpo = DoubleArray(corpos)
+        val vcorpo = DoubleArray(corpos)
+        val fcorpo = DoubleArray(corpos) { uni(0.0, TAU) }
+        var giro = 0.0
+        var palp = 0.0
+        var vpalp = 0.0
+        var piscaEm = uni(1.5, 4.0)
+        var piscaAte = 0.0
+    }
+
+    private fun partes(): Partes {
+        st.pc?.let { return it }
+        val p = if (skin == Skin.HUMANA) Partes(27, 3, 8) else Partes(48, 2, 0)
+        st.pc = p
+        return p
     }
 
     fun raioQueCabe(w: Double, h: Double, d: Double): Double {
@@ -122,7 +146,7 @@ class Figura(skinInicial: Skin) : Arte {
         s.ondas.removeAll { s.t - it[0] >= 1.3 }
         when (skin) {
             Skin.SERAFIM_GRAVURA -> evoluirGravura(dt)
-            Skin.OLHO, Skin.HUMANA -> evoluirPolar(dt)
+            Skin.OLHO, Skin.HUMANA -> evoluirPartes(dt)
             else -> {
                 evoluirOfanim(dt)
                 if (skin == Skin.OFANIM_ALADO) {
@@ -174,29 +198,82 @@ class Figura(skinInicial: Skin) : Arte {
         s.faseAsa += dt * TAU * (mistura(0.2, 0.1, 0.9, 1.6, 0.6) + 0.8 * falar)
     }
 
-    private fun evoluirPolar(dt: Double) {
+    /**
+     * A física das peças, como no Figura.qml: cada junta é uma mola, e a de fora
+     * recebe o contrário da velocidade da de dentro (o chicote dos tentáculos).
+     */
+    private fun evoluirPartes(dt: Double) {
         val s = st
         val t = s.t
+        val pc = partes()
         val ouvir = p(LISTENING)
+        val ferr = p(TOOLS)
         val falar = p(SPEAKING) * voz
         val dG = suave(desperto)
-        // a Humana gira inteira; o Olho não (só o halo se torce, e volta)
-        if (skin == Skin.HUMANA) s.giro += dt * (mistura(0.035, 0.0, 0.45, 0.12, 0.06) + 0.15 * falar)
-        s.torcao = mistura(0.03, 0.0, 0.16, 0.05, 0.05) * ruido(t * 0.9, 7.0)
-        // as molas: cada setor busca o seu alvo, que ondula pelo estado; ao
-        // despertar, as pontas vêm recolhidas
-        val ext = mistura(0.0, 0.035, -0.015, 0.0, 0.02) - 0.45 * (1 - dG)
-        val amp = mistura(0.018, 0.008, 0.04, 0.02, 0.03)
-        val fr = mistura(0.45, 0.3, 1.5, 2.6, 1.1)
-        // a onda nascida neste quadro (uma por sílaba) chuta todas as molas
+        val humana = skin == Skin.HUMANA
+        // a onda nascida neste quadro (uma por sílaba) chuta as bases
         val chute = if (s.ultimaOnda == s.t && s.ondas.isNotEmpty()) s.ondas.last()[1] else 0.0
-        for (i in 0 until 16) {
-            val alvo = ext + amp * ruido(t * fr, s.semCampo[i])
-            s.vcampo[i] += (55 * (alvo - s.campo[i]) - 6.5 * s.vcampo[i]) * dt
-            if (chute > 0) s.vcampo[i] += chute * uni(0.15, 0.55)
-            s.campo[i] += s.vcampo[i] * dt
+        val amp = if (humana) mistura(0.16, 0.06, 0.30, 0.12, 0.18) else mistura(0.13, 0.05, 0.26, 0.10, 0.17)
+        val fr = if (humana) mistura(0.32, 0.20, 0.26, 1.8, 0.7) else mistura(0.55, 0.40, 0.80, 2.4, 1.2)
+        val ganho = if (humana) GANHO_MEMBRO else GANHO_RAIO
+        val k = if (humana) K_MEMBRO else K_RAIO
+        val c = if (humana) C_MEMBRO else C_RAIO
+        val lim = if (humana) LIM_MEMBRO else LIM_RAIO
+        val nj = pc.juntas
+        // ao despertar, as peças vêm encolhidas e se abrem
+        val enrola = (1 - dG) * 0.9
+        // espasmo das ferramentas: uma junta qualquer leva um tranco
+        if (ferr > 0.05 && Random.nextDouble() < ferr * dt * 4) pc.vel[sorteia(pc.cadeias)][sorteia(nj)] += uni(-4.0, 4.0)
+        if (chute > 0) {
+            for (i in 0 until pc.cadeias) {
+                if (Random.nextDouble() < 0.7) pc.vel[i][0] += pc.sinal[i] * chute * uni(0.6, 1.6) * (if (humana) 1.2 else 1.8)
+                if (!humana) pc.vest[i] += chute * uni(0.4, 1.2)
+            }
         }
-        s.tremor = 0.012 * p(TOOLS)
+        val n = maxOf(1, kotlin.math.ceil(dt / 0.012).toInt())
+        val h = dt / n
+        repeat(n) {
+            for (i in 0 until pc.cadeias) {
+                val a = pc.ang[i]
+                val v = pc.vel[i]
+                val sg = pc.sinal[i]
+                for (j in 0 until nj) {
+                    val onda = sin(TAU * fr * t + pc.fase[i] - 1.1 * j)
+                    val alvo = sg * (amp * ganho[j] * onda - enrola * ganho[j]) + amp * 0.35 * ruido(t * fr * 1.7, pc.sem[i] + j)
+                    // o chicote: a junta de fora atrasa em relação à de dentro
+                    val acc = k[j] * (alvo - a[j]) - c[j] * v[j] - (if (j > 0) 4.0 * v[j - 1] else 0.0)
+                    v[j] += acc * h
+                    a[j] = (a[j] + v[j] * h).coerceIn(-lim[j], lim[j])
+                }
+                if (!humana) {
+                    val ae = mistura(0.0, 0.06, -0.03, 0.0, 0.04) - 0.55 * (1 - dG)
+                    pc.vest[i] += (40 * (ae - pc.est[i]) - 6 * pc.vest[i]) * h
+                    pc.est[i] = (pc.est[i] + pc.vest[i] * h).coerceIn(-0.6, 0.5)
+                }
+            }
+            if (humana) {
+                val ab = mistura(0.04, 0.02, 0.07, 0.03, 0.05)
+                for (b in 0 until pc.corpos) {
+                    val alvoB = ab * sin(TAU * 0.22 * t + pc.fcorpo[b]) + ab * 0.4 * ruido(t * 0.5, pc.fcorpo[b] * 7)
+                    pc.vcorpo[b] += (14 * (alvoB - pc.corpo[b]) - 3.2 * pc.vcorpo[b]) * h
+                    pc.corpo[b] = (pc.corpo[b] + pc.vcorpo[b] * h).coerceIn(-0.12, 0.12)
+                }
+            }
+        }
+        if (humana && chute > 0) for (b in 0 until pc.corpos) pc.vcorpo[b] += (if (Random.nextBoolean()) -1 else 1) * chute * 0.35
+        if (!humana) {
+            // a coroa de raios gira; pensando, mais depressa
+            pc.giro += dt * (mistura(0.06, 0.02, 0.35, 0.12, 0.10) + 0.2 * falar)
+            // as pálpebras: apertam pensando, piscam de tempos em tempos, fechadas ao despertar
+            if (t >= pc.piscaEm) {
+                pc.piscaAte = t + 0.11
+                pc.piscaEm = t + uni(2.5, 6.5)
+            }
+            var fecha = if (t < pc.piscaAte) 1.0 else mistura(0.06, 0.0, 0.35, 0.22, 0.08)
+            fecha = max(fecha, 1 - dG)
+            pc.vpalp += (320 * (fecha - pc.palp) - 30 * pc.vpalp) * dt
+            pc.palp = (pc.palp + pc.vpalp * dt).coerceIn(0.0, 1.0)
+        }
         // a pupila abre para ouvir e fecha para pensar; encarar a leva ao meio
         val dil = mistura(1.0, 1.15, 0.82, 0.78, 1.04) + 0.12 * ouvir * mic
         s.pupila += (dil - s.pupila) * min(1.0, dt * 5)
@@ -331,13 +408,16 @@ class Figura(skinInicial: Skin) : Arte {
                     gx = gx * (1 - pensar) + vx * pensar
                     gy = gy * (1 - pensar) + vy * pensar
                 }
-                val c = s.campo
-                fx.v4("img", s.giro, s.torcao, 0.025 * falar + 0.006 * sin(t * 1.1) * dP, s.pupila)
-                fx.v4("img2", s.tremor, s.encarar, 0.0, 0.0)
-                fx.v4("campo0", c[0], c[1], c[2], c[3])
-                fx.v4("campo1", c[4], c[5], c[6], c[7])
-                fx.v4("campo2", c[8], c[9], c[10], c[11])
-                fx.v4("campo3", c[12], c[13], c[14], c[15])
+                val pc = partes()
+                fx.v4("img", pc.giro, 0.0, 0.025 * falar + 0.006 * sin(t * 1.1) * dP, s.pupila)
+                fx.v4("img2", 0.0, s.encarar, pc.palp, 0.0)
+                for (m in 0 until 48) {
+                    when {
+                        m < pc.cadeias -> pc.ang[m].let { a -> fx.v4(NOMES_M[m], a[0], a[1], if (pc.juntas > 2) a[2] else pc.est[m], 0.0) }
+                        m < pc.cadeias + pc.corpos -> fx.v4(NOMES_M[m], pc.corpo[m - pc.cadeias], 0.0, 0.0, 0.0)
+                        else -> fx.zero4(NOMES_M[m])
+                    }
+                }
             }
             Skin.SERAFIM_GRAVURA -> {
                 val dG = suave(desperto)
@@ -464,5 +544,18 @@ class Figura(skinInicial: Skin) : Arte {
         pos.zero4("sombra")
         pos.v4("corSombra", corFundo[0].toDouble(), corFundo[1].toDouble(), corFundo[2].toDouble(), 1.0)
         pos.v4("modo", 0.0, 1.0, 0.0, 0.0)
+    }
+
+    private companion object {
+        // os nomes dos uniforms das juntas, feitos uma vez (o quadro não aloca)
+        val NOMES_M = Array(48) { "m$it" }
+        val GANHO_MEMBRO = doubleArrayOf(0.45, 1.0, 1.25)
+        val GANHO_RAIO = doubleArrayOf(0.7, 1.25)
+        val K_MEMBRO = doubleArrayOf(26.0, 34.0, 42.0)
+        val K_RAIO = doubleArrayOf(30.0, 38.0)
+        val C_MEMBRO = doubleArrayOf(4.2, 4.8, 5.4)
+        val C_RAIO = doubleArrayOf(4.6, 5.2)
+        val LIM_MEMBRO = doubleArrayOf(0.32, 0.7, 0.8)
+        val LIM_RAIO = doubleArrayOf(0.5, 0.75)
     }
 }
