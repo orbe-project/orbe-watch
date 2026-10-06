@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -96,6 +97,22 @@ internal object Previas {
     }
 }
 
+/**
+ * A skin parada, em imagem (previa_<skin> em src/debug), tingida na [cor]: o
+ * lugar do orbe em GL nas prévias do Android Studio. Fora do debug, nada.
+ */
+@Composable
+internal fun SkinParada(skin: Skin, cor: Color, modifier: Modifier = Modifier) {
+    val ctx = LocalContext.current
+    @Suppress("DiscouragedApi")
+    val id = ctx.resources.getIdentifier("previa_${skin.id}", "drawable", ctx.packageName)
+    if (id == 0) return
+    androidx.compose.foundation.Image(
+        androidx.compose.ui.res.painterResource(id), contentDescription = skin.nome, modifier = modifier,
+        colorFilter = if (skin == Skin.ANEL) null else androidx.compose.ui.graphics.ColorFilter.tint(cor, androidx.compose.ui.graphics.BlendMode.Modulate),
+    )
+}
+
 /** O passo das miniaturas: anda só com o menu na tela (TelaAjustes). */
 val LocalQuadro = staticCompositionLocalOf<IntState> { mutableIntStateOf(0) }
 
@@ -114,6 +131,11 @@ fun vaiEVolta(passo: Int, n: Int): Int {
  */
 @Composable
 fun Miniatura(chave: ChavePrevia, modifier: Modifier = Modifier) {
+    // na prévia do Android Studio não há GL: a imagem parada da skin (src/debug)
+    if (LocalInspectionMode.current) {
+        SkinParada(chave.skin, chave.cor, modifier)
+        return
+    }
     val ctx = LocalContext.current
     val densidade = LocalDensity.current.density
     LaunchedEffect(chave) { Previas.pedir(ctx, chave, densidade) }
