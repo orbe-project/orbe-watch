@@ -559,7 +559,9 @@ class Figura(skinInicial: Skin) : Arte {
 
     private companion object {
         // os nomes dos uniforms das juntas, feitos uma vez (o quadro não aloca)
-        val NOMES_M = Array(48) { "m$it" }
+        // as transformações das peças: no relógio o imagem.frag as lê do vetor de
+        // uniforms Mu (indexado direto pela GPU); m0..m47 avulsos são do Qt
+        val NOMES_M = Array(48) { "Mu[$it]" }
         val GANHO_MEMBRO = doubleArrayOf(0.45, 1.0, 1.25)
         val GANHO_RAIO = doubleArrayOf(0.7, 1.25)
         val K_MEMBRO = doubleArrayOf(26.0, 34.0, 42.0)

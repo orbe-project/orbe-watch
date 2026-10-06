@@ -61,7 +61,7 @@
         <!-- diz à Hina se o orbe está na tela: ela não abre por cima dele -->
         <provider
             android:name=".TelaProvider"
-            android:authorities="io.orbe.watch.tela"
+            android:authorities="${applicationId}.tela"
             android:exported="true" />
 
         <service
