@@ -55,7 +55,13 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+
+    // a bancada (androidTest, com -Pbancada) mede os shaders na GPU do relógio,
+    // fora da tela: um pacote à parte, para não tocar no app instalado. Sem a
+    // flag, os testes seguem no debug (o AGP 9 só testa o testBuildType)
+    if (project.hasProperty("bancada")) testBuildType = "bancada"
 
     buildTypes {
         release {
@@ -64,6 +70,11 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // sem loja: o release instala com a chave de depuração, por cima do debug
             signingConfig = signingConfigs.getByName("debug")
+        }
+        create("bancada") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".bancada"
+            matchingFallbacks += listOf("debug")
         }
     }
 
@@ -119,4 +130,7 @@ dependencies {
     implementation(libs.okhttp)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.junit)
+    androidTestImplementation(libs.junit)
 }

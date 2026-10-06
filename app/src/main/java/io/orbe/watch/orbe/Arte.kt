@@ -39,6 +39,8 @@ interface Arte {
     val pos: Uniformes
     /** a célula da figura no item (cx, cy, meia largura, meia altura): fora dela a máscara é vazia */
     val recorte: DoubleArray
+    /** definições a mais do primeiro passe neste quadro (uma variante mais leve do shader); vazia, a de sempre */
+    val variante: Map<String, Int> get() = emptyMap()
 
     fun avancar(dt: Double)
 
