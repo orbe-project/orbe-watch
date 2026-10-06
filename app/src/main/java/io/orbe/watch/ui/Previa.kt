@@ -31,7 +31,11 @@ import kotlin.math.roundToInt
 // do relógio com elas e perdia quadros.
 
 /** Onde a miniatura aparece: o traço de cada lugar (Miniatura.qml). */
-enum class Papel(val peso: Double) { TOPO(1.0), CARTAO(1.2) }
+enum class Papel(val peso: Double, val quadros: Int = 16) {
+    TOPO(1.0), CARTAO(1.2),
+    /** as instâncias ativas do orbe, paradas, no pé da tela (TelaOrbe) */
+    INSTANCIA(1.6, quadros = 1),
+}
 
 /** Tudo que muda o desenho de uma miniatura: outra chave, outros quadros. */
 data class ChavePrevia(
@@ -51,19 +55,22 @@ internal object Previas {
     private const val QUADROS = 16
     /** Entre um quadro e outro: o ritmo das miniaturas vivas no rodízio do Motor. */
     const val PASSO_MS = 100L
-    /** Prévias guardadas: as do menu (6 cartões e o topo) e as que estão saindo. */
-    private const val GUARDADAS = 10
+    /** Prévias guardadas: as do menu (os cartões e o topo), as das instâncias e as que estão saindo. */
+    private const val GUARDADAS = 16
 
     private val prontas = mutableStateMapOf<ChavePrevia, List<ImageBitmap>>()
     private val ordem = ArrayDeque<ChavePrevia>()
-    private val pedidas = HashMap<Pair<Papel, Skin>, Pair<ChavePrevia, Motor.Pedido>>()
+    private val pedidas = HashMap<Triple<Papel, Skin, Color?>, Pair<ChavePrevia, Motor.Pedido>>()
 
     fun quadros(chave: ChavePrevia): List<ImageBitmap>? = prontas[chave]
 
-    /** Na thread principal. Cada lugar (papel e skin) tem um pedido só: o novo desiste do velho. */
+    /**
+     * Na thread principal. Cada lugar (papel e skin) tem um pedido só: o novo
+     * desiste do velho. As das instâncias, uma por cor, convivem.
+     */
     fun pedir(ctx: Context, chave: ChavePrevia, densidade: Float) {
         if (chave in prontas) return
-        val vaga = chave.papel to chave.skin
+        val vaga = Triple(chave.papel, chave.skin, chave.cor.takeIf { chave.papel == Papel.INSTANCIA })
         val antes = pedidas[vaga]
         if (antes?.first == chave) return
         antes?.second?.cancelar()
@@ -79,7 +86,7 @@ internal object Previas {
         }
         val w = (chave.largura.value * densidade).roundToInt()
         val h = (chave.altura.value * densidade).roundToInt()
-        val pedido = Motor.previa(ctx, cena, w, h, densidade, QUADROS, PASSO_MS / 1000.0) { bitmaps ->
+        val pedido = Motor.previa(ctx, cena, w, h, densidade, min(QUADROS, chave.papel.quadros), PASSO_MS / 1000.0) { bitmaps ->
             if (pedidas[vaga]?.first == chave) pedidas.remove(vaga)
             prontas[chave] = bitmaps.map { it.asImageBitmap() }
             ordem.addLast(chave)

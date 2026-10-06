@@ -1,5 +1,9 @@
 package io.orbe.watch.ui
 
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
+import androidx.wear.compose.foundation.curvedComposable
+import androidx.compose.ui.draw.alpha
 import android.view.View
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -117,6 +121,8 @@ private val ARREMESSO = 400.dp
 
 /** O rótulo da sessão, curvado: a folga da borda da tela e o arco máximo do alto e do pé (graus). */
 private val BORDA_ROTULO = 6.dp
+/** as miniaturas das instâncias ativas, no pé */
+private val LADO_INSTANCIA = 14.dp
 private const val ARCO_TITULO = 150f
 private const val ARCO_ROTULO = 100f
 
@@ -223,16 +229,26 @@ fun TelaOrbe(
                     // as vagas se alternam entre os orbes do agente: cada um tem as suas
                     val m = grupo.size
                     val doAgente = sessoes.orEmpty().filter { it.agente == ag }
-                    val n = Instancias.contar(Instancias.doOrbe(doAgente.map { it.vaga }, j, m), abreClaude)
+                    val ativas = Instancias.doOrbe(doAgente.map { it.vaga }, j, m).sorted()
+                    val n = Instancias.contar(ativas, abreClaude)
                     Fileira(vm, daPagina, emTela, n, ajustes.tamanhoDe(skin), redonda, podeAgora) { k, atual ->
                         // a sessão desta instância, na cor dela; no orbe em tela o
                         // raciocínio ocupa o mesmo lugar e tem a vez
                         val cor = daPagina.copy(instancia = k).corFigura().let { Color(it[0], it[1], it[2]) }
                         if (sessoes != null) {
+                            // as instâncias ativas deste orbe, paradas, antes da pasta: quantas há e qual é esta
+                            val miniaturas = ativas.map { a ->
+                                val c = daPagina.copy(instancia = a).corFigura().let { Color(it[0], it[1], it[2]) }
+                                ChavePrevia(
+                                    Papel.INSTANCIA, skin, LADO_INSTANCIA, LADO_INSTANCIA, glitch = false, linhas = false,
+                                    c, daPagina.tema.anel, daPagina.tema.fundo,
+                                ) to (a == k)
+                            }
                             RotuloSessao(
                                 doAgente.firstOrNull { it.vaga == Instancias.vaga(k, j, m) }, abreClaude, agente, cor,
                                 comPe = !(atual && comTexto),
                                 Modifier.fillMaxSize(),
+                                miniaturas,
                             )
                         } else {
                             Rotulo(agente, "", cor, Modifier.fillMaxSize())
@@ -561,7 +577,11 @@ private fun GraphicsLayerScope.roda(desvio: Float, vertical: Boolean) {
  * Com o raciocínio na tela, o pé é dele.
  */
 @Composable
-private fun RotuloSessao(sessao: SessaoInfo?, abreClaude: Boolean, agente: String, cor: Color, comPe: Boolean, modifier: Modifier = Modifier) {
+private fun RotuloSessao(
+    sessao: SessaoInfo?, abreClaude: Boolean, agente: String, cor: Color, comPe: Boolean, modifier: Modifier = Modifier,
+    /** as instâncias ativas do orbe (e se é a em tela), em miniatura antes da pasta */
+    miniaturas: List<Pair<ChavePrevia, Boolean>> = emptyList(),
+) {
     val titulo = sessao?.let { it.titulo.ifEmpty { it.rotulo } } ?: "livre"
     val pasta = sessao?.pasta.orEmpty().let { if (it.isEmpty() || it.startsWith("/")) it else "/$it" }
     val pe = when {
@@ -569,12 +589,19 @@ private fun RotuloSessao(sessao: SessaoInfo?, abreClaude: Boolean, agente: Strin
         sessao.canal || sessao.ouve -> listOf(pasta, "ouve o orbe").filter { it.isNotEmpty() }.joinToString(" · ")
         else -> listOf(pasta, "não ouve o orbe").filter { it.isNotEmpty() }.joinToString(" · ")
     }
-    Rotulo(listOf(agente, titulo).filter { it.isNotEmpty() }.joinToString(" · "), if (comPe) pe else "", cor, modifier)
+    Rotulo(
+        listOf(agente, titulo).filter { it.isNotEmpty() }.joinToString(" · "), if (comPe) pe else "", cor, modifier,
+        if (comPe) miniaturas else emptyList(),
+    )
 }
 
-/** O rótulo curvado na borda: [alto] na [cor] do orbe, [pe] apagado embaixo. */
+/**
+ * O rótulo curvado na borda: [alto] na [cor] do orbe, [pe] apagado embaixo.
+ * As [miniaturas] vão no pé antes do texto, na diagonal de baixo à esquerda;
+ * a da instância em tela inteira, as outras apagadas.
+ */
 @Composable
-private fun Rotulo(alto: String, pe: String, cor: Color, modifier: Modifier = Modifier) {
+private fun Rotulo(alto: String, pe: String, cor: Color, modifier: Modifier = Modifier, miniaturas: List<Pair<ChavePrevia, Boolean>> = emptyList()) {
     val corTitulo = cor.alfa(0.75f)
     val corPe = Estilo.texto.alfa(0.45f)
     Box(modifier.padding(BORDA_ROTULO)) {
@@ -588,16 +615,24 @@ private fun Rotulo(alto: String, pe: String, cor: Color, modifier: Modifier = Mo
                 )
             }
         }
-        if (pe.isNotEmpty()) {
+        if (pe.isNotEmpty() || miniaturas.isNotEmpty()) {
             // no pé a leitura é da esquerda para a direita: o sentido contrário ao do alto
             CurvedLayout(anchor = 90f, angularDirection = CurvedDirection.Angular.Reversed) {
-                basicCurvedText(
-                    pe,
-                    style = { CurvedTextStyle(color = corPe, fontSize = 9.sp, fontFamily = FontFamily.Monospace) },
-                    modifier = CurvedModifier.sizeIn(maxSweepDegrees = ARCO_ROTULO),
-                    angularDirection = CurvedDirection.Angular.Reversed,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                for ((chave, emUso) in miniaturas) {
+                    curvedComposable {
+                        Miniatura(chave, Modifier.size(LADO_INSTANCIA).alpha(if (emUso) 1f else 0.5f))
+                    }
+                }
+                if (pe.isNotEmpty()) {
+                    if (miniaturas.isNotEmpty()) curvedComposable { Spacer(Modifier.width(3.dp)) }
+                    basicCurvedText(
+                        pe,
+                        style = { CurvedTextStyle(color = corPe, fontSize = 9.sp, fontFamily = FontFamily.Monospace) },
+                        modifier = CurvedModifier.sizeIn(maxSweepDegrees = ARCO_ROTULO),
+                        angularDirection = CurvedDirection.Angular.Reversed,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
