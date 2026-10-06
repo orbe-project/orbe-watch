@@ -23,6 +23,7 @@ import android.provider.Settings
 import android.util.Log
 import androidx.core.content.ContextCompat
 import io.orbe.watch.MainActivity
+import io.orbe.watch.Vizinhos
 import io.orbe.watch.R
 import io.orbe.watch.dados.Cofre
 import kotlin.math.sqrt
@@ -238,6 +239,11 @@ class ServicoSacudida : Service(), SensorEventListener {
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
 
     private fun abrirOrbe() {
+        // chamou a Hina: o orbe não abre por cima dela
+        if (Vizinhos.hinaNaFrente(this)) {
+            Log.i(TAG, "a Hina está na tela: a sacudida não abre o orbe")
+            return
+        }
         if (!Settings.canDrawOverlays(this)) {
             Log.w(TAG, "sem permissão de sobreposição: o Android bloqueia abrir a tela a partir do serviço")
         }

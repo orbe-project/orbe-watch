@@ -22,6 +22,11 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- a Hina (HinaWatch) diz se está na tela: o orbe não abre por cima dela (Vizinhos) -->
+    <queries>
+        <provider android:authorities="com.projecthina.hina.tela" />
+    </queries>
+
     <!-- a ponte do daemon fala ws:// na rede local (ou na tailnet) -->
     <application
         android:allowBackup="false"
@@ -52,6 +57,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- diz à Hina se o orbe está na tela: ela não abre por cima dele -->
+        <provider
+            android:name=".TelaProvider"
+            android:authorities="io.orbe.watch.tela"
+            android:exported="true" />
 
         <service
             android:name=".gesto.ServicoSacudida"
