@@ -1,5 +1,6 @@
 package io.orbe.watch.orbe
 
+import io.orbe.watch.orbe.Estado.IDLE
 import io.orbe.watch.orbe.Estado.LISTENING
 import io.orbe.watch.orbe.Estado.SPEAKING
 import io.orbe.watch.orbe.Estado.THINKING
@@ -124,6 +125,7 @@ class Anel : Arte {
     private var glShear = 0.0
     private var glDx = 0.0
     private val glBands = ArrayList<DoubleArray>()   // (y0, altura, deslocamento)
+    private var glRepouso = false                     // a rajada é a fraca do orbe parado
     private val dE = DoubleArray(nGota)
     private val dAng = DoubleArray(nGota)
     private val dDist = DoubleArray(nGota)
@@ -263,22 +265,20 @@ class Anel : Arte {
             tH[j] = lim(tH[j] + tV[j] * dt, -3.0, 16.0)
         }
 
-        // glitch do pensamento: rajadas curtas e irregulares, mais densas no fundo do raciocínio
+        // glitch do pensamento: rajadas curtas e irregulares, mais densas no fundo do raciocínio;
+        // em repouso, um resto dele: raras, fracas (GL_REPOUSO), sem salto de quadro
         val wt = mix[THINKING]
         if (wt > 0.25 && glitch) {
             if (t >= glProx) {
                 glAte = t + uni(0.05, 0.20)
                 glProx = glAte + uni(0.06, 0.75) / (0.4 + wt)
-                glLo = sorteia(nW)
-                glSpan = 2 + sorteia(max(3, nW / 3) - 1)
-                glAmp = uni(5.0, 15.0) * (if (Random.nextDouble() < 0.5) -1 else 1)
-                glShear = uni(-0.09, 0.09)
-                glJump = if (Random.nextDouble() < 0.34) 1 + sorteia(nQuadros - 1) else 0
-                glDx = if (Random.nextDouble() < 0.75) uni(1.6, 5.5) else 0.0
-                glBands.clear()
-                repeat(sorteia(5)) {
-                    glBands.add(doubleArrayOf(uni(-46.0, 40.0), uni(2.0, 9.0), uni(5.0, 20.0) * (if (Random.nextDouble() < 0.5) -1 else 1)))
-                }
+                sortearRajada(repouso = false)
+            }
+        } else if (mix[IDLE] > 0.5 && glitch) {
+            if (t >= glProx) {
+                glAte = t + uni(0.05, 0.15)
+                glProx = glAte + uni(1.5, 4.5)
+                sortearRajada(repouso = true)
             }
         } else {
             glAte = 0.0
@@ -291,6 +291,21 @@ class Anel : Arte {
                 dSpd[d] *= 0.97.pow(k)
                 dE[d] *= 0.93.pow(k)
             }
+        }
+    }
+
+    /** A forma de uma rajada de glitch; [repouso]: a fraca do orbe parado (Anel.qml). */
+    private fun sortearRajada(repouso: Boolean) {
+        glRepouso = repouso
+        glLo = sorteia(nW)
+        glSpan = 2 + sorteia(max(3, nW / 3) - 1)
+        glAmp = uni(5.0, 15.0) * (if (Random.nextDouble() < 0.5) -1 else 1)
+        glShear = uni(-0.09, 0.09)
+        glJump = if (!repouso && Random.nextDouble() < 0.34) 1 + sorteia(nQuadros - 1) else 0
+        glDx = if (Random.nextDouble() < 0.75) uni(1.6, 5.5) else 0.0
+        glBands.clear()
+        repeat(sorteia(if (repouso) 2 else 5)) {
+            glBands.add(doubleArrayOf(uni(-46.0, 40.0), uni(2.0, 9.0), uni(5.0, 20.0) * (if (Random.nextDouble() < 0.5) -1 else 1)))
         }
     }
 
@@ -311,7 +326,7 @@ class Anel : Arte {
         val scb = (artBox / 256) * envEsc * pulse * esc
 
         val rajada = t < glAte
-        val glk = if (rajada) mix[THINKING] else 0.0
+        val glk = if (!rajada) 0.0 else if (glRepouso) GL_REPOUSO * mix[IDLE] else mix[THINKING]
         var idx = floor(framePos).toInt() % nQuadros
         if (glk > 0 && glJump != 0) idx = (idx + glJump) % nQuadros
 
@@ -380,3 +395,6 @@ class Anel : Arte {
         }
     }
 }
+
+/** a força da rajada de glitch do anel em repouso, perto da de pensando (até 1) */
+private const val GL_REPOUSO = 0.3

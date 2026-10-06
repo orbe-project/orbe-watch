@@ -399,15 +399,17 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
         if (carregado) conectar()
     }
 
-    fun saiu() {
+    /** O orbe saiu da tela; [fechando]: o app fechou de vez (o ViewModel e a ponte vão junto). */
+    fun saiu(fechando: Boolean = false) {
         naTela = false
         pararEscuta()
         // fora da tela, os toques contados não valem mais
         contagem?.cancel()
         toques = 0
         largar()
-        // com um pedido esperando a resposta, a ponte fica: a resposta traz o orbe de volta
-        if (pedidoNoAr()) esperarAoFundo() else soltarPonte()
+        // com um pedido esperando a resposta, a ponte fica: a resposta traz o orbe de volta.
+        // Fechando de vez não há o que esperar: a ponte morre com o ViewModel
+        if (pedidoNoAr() && !fechando) esperarAoFundo() else soltarPonte()
     }
 
     private fun soltarPonte() {
