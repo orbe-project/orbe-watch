@@ -419,11 +419,31 @@ class Figura(skinInicial: Skin) : Arte {
                     fx.v4("img", 0.0, 0.0, 0.025 * falar + 0.006 * sin(t * 1.1) * dP, 1.0)
                     fx.zero4("img2")
                 }
+                // os ângulos (Mu) e, já feitos aqui uma vez por quadro, os senos e
+                // cossenos que o imagem.frag do relógio usa (Mc, Md): sin/cos por pixel
+                // custavam um terço do quadro do Rei dos Ratos na Adreno 504
                 for (m in 0 until 48) {
                     when {
-                        m < pc.cadeias -> pc.ang[m].let { a -> fx.v4(NOMES_M[m], a[0], a[1], if (pc.juntas > 2) a[2] else pc.est[m], 0.0) }
-                        m < pc.cadeias + pc.corpos -> fx.v4(NOMES_M[m], pc.corpo[m - pc.cadeias], 0.0, 0.0, 0.0)
-                        else -> fx.zero4(NOMES_M[m])
+                        m < pc.cadeias -> pc.ang[m].let { a ->
+                            val terceiro = if (pc.juntas > 2) a[2] else pc.est[m]
+                            fx.v4(NOMES_M[m], a[0], a[1], terceiro, 0.0)
+                            val a0 = a[0]
+                            val a1 = a0 + a[1]
+                            val a2 = a1 + terceiro
+                            fx.v4(NOMES_MC[m], cos(a0), sin(a0), cos(a1), sin(a1))
+                            fx.v4(NOMES_MD[m], cos(a2), sin(a2), 0.0, 0.0)
+                        }
+                        m < pc.cadeias + pc.corpos -> {
+                            val c = pc.corpo[m - pc.cadeias]
+                            fx.v4(NOMES_M[m], c, 0.0, 0.0, 0.0)
+                            fx.v4(NOMES_MC[m], cos(c), sin(c), 0.0, 0.0)
+                            fx.zero4(NOMES_MD[m])
+                        }
+                        else -> {
+                            fx.zero4(NOMES_M[m])
+                            fx.zero4(NOMES_MC[m])
+                            fx.zero4(NOMES_MD[m])
+                        }
                     }
                 }
             }
@@ -562,6 +582,8 @@ class Figura(skinInicial: Skin) : Arte {
         // as transformações das peças: no relógio o imagem.frag as lê do vetor de
         // uniforms Mu (indexado direto pela GPU); m0..m47 avulsos são do Qt
         val NOMES_M = Array(48) { "Mu[$it]" }
+        val NOMES_MC = Array(48) { "Mc[$it]" }
+        val NOMES_MD = Array(48) { "Md[$it]" }
         val GANHO_MEMBRO = doubleArrayOf(0.45, 1.0, 1.25)
         val GANHO_RAIO = doubleArrayOf(0.7, 1.25)
         val K_MEMBRO = doubleArrayOf(26.0, 34.0, 42.0)
