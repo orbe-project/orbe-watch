@@ -510,6 +510,9 @@ internal object Motor {
         val of = oficina ?: return
         val prim = of.primitivas(arte.skin)
         val figura = prim ?: of.figura(arte.skin, arte.variante)        // sem primitivas nesta GPU, por pixel
+        // a outra variante (o anel com e sem as línguas) compila já no primeiro quadro da
+        // arte, na abertura: a primeira língua que acende não para o orbe (362 ms no Adreno 504)
+        if (prim == null) arte.outraVariante?.let { of.figura(arte.skin, it) }
         val pos = of.pos()
 
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, saida)
