@@ -44,6 +44,10 @@ class Anel : Arte {
     private val nW = 36
     private val nLingua = 10
     private val nGota = 7
+    // os nomes dos uniforms por índice, montados uma vez: o quadro não aloca string
+    private val nomesCampo = Array(9) { "campo$it" }
+    private val nomesLingua = Array(nLingua) { "lingua$it" }
+    private val nomesGota = Array(nGota) { "gota$it" }
     private val nQuadros = 62
 
     // ── paleta: accent do tema derivado por HSV, como no _system_palette ──
@@ -323,7 +327,7 @@ class Anel : Arte {
         }
         for (i in 0 until nW) fmax = max(fmax, abs(campos[i]))
         for (i in 0 until 9) {
-            fx.v4("campo$i", lim(1 + campos[4 * i] / 50, 0.84, 1.28), lim(1 + campos[4 * i + 1] / 50, 0.84, 1.28),
+            fx.v4(nomesCampo[i], lim(1 + campos[4 * i] / 50, 0.84, 1.28), lim(1 + campos[4 * i + 1] / 50, 0.84, 1.28),
                 lim(1 + campos[4 * i + 2] / 50, 0.84, 1.28), lim(1 + campos[4 * i + 3] / 50, 0.84, 1.28))
         }
 
@@ -342,20 +346,20 @@ class Anel : Arte {
         for (j in 0 until nLingua) {
             val hj = tH[j]
             if (hj < 1.2) {
-                fx.zero4("lingua$j")
+                fx.zero4(nomesLingua[j])
                 continue
             }
             val a = tAng[j]
             val sa = lim(1 + campo(a) / 50, 0.84, 1.28)
             val rb = artEdge * scb * sa * 0.94
-            fx.v4("lingua$j", a, rb, min(rLim * esc, rb + hj * 2 * esc), tW[j])
+            fx.v4(nomesLingua[j], a, rb, min(rLim * esc, rb + hj * 2 * esc), tW[j])
             ate = j + 1
         }
         fx.v1("nLingua", ate.toDouble())
         for (d in 0 until nGota) {
             val e = dE[d]
-            if (e <= 0.04) fx.zero4("gota$d")
-            else fx.v4("gota$d", cos(dAng[d]) * dDist[d] * esc, sin(dAng[d]) * dDist[d] * esc, e, 0.0)
+            if (e <= 0.04) fx.zero4(nomesGota[d])
+            else fx.v4(nomesGota[d], cos(dAng[d]) * dDist[d] * esc, sin(dAng[d]) * dDist[d] * esc, e, 0.0)
         }
 
         // segundo passe
