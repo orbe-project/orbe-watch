@@ -334,6 +334,11 @@ class Anel : Arte {
         fx.v4("gl", glLo.toDouble(), if (glk > 0 && glShear != 0.0) glSpan.toDouble() else 0.0, glShear * glk, 0.0)
         fx.v4("tempo", t, envAlfa, 0.0, 0.0)
 
+        // o laço das línguas do anel.frag vai só até a última ativa: as de cima já
+        // eram puladas (ponta 0), e um limite que o compilador não conhece o
+        // impede de desenrolar o laço e predicar as dez línguas em todo pixel,
+        // que custava 6x o anel parado na GPU do relógio
+        var ate = 0
         for (j in 0 until nLingua) {
             val hj = tH[j]
             if (hj < 1.2) {
@@ -344,7 +349,9 @@ class Anel : Arte {
             val sa = lim(1 + campo(a) / 50, 0.84, 1.28)
             val rb = artEdge * scb * sa * 0.94
             fx.v4("lingua$j", a, rb, min(rLim * esc, rb + hj * 2 * esc), tW[j])
+            ate = j + 1
         }
+        fx.v1("nLingua", ate.toDouble())
         for (d in 0 until nGota) {
             val e = dE[d]
             if (e <= 0.04) fx.zero4("gota$d")
