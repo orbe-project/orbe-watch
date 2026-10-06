@@ -253,6 +253,19 @@ private fun MenuEscopo.sessao(vm: OrbeViewModel, ajustes: Ajustes, retrato: Retr
             Linha(if (n == 1) "1 toque" else "$n toques", subtitulo = ajustes.toque(n).nome, aoClicar = { vm.proximaAcao(n) })
         }
     }
+    grupo("Tocar e segurar", "Os toques antes, o último segurado.")
+    (1..ajustes.segurar.size).forEach { n ->
+        linha {
+            Linha(nomeSegurar(n), subtitulo = ajustes.segura(n).nome, aoClicar = { vm.proximaSegurar(n) })
+        }
+    }
+}
+
+/** [n] toques com o último segurado: "Segura", "Toca e segura", "2 toques e segura"... */
+private fun nomeSegurar(n: Int) = when (n) {
+    1 -> "Segura"
+    2 -> "Toca e segura"
+    else -> "${n - 1} toques e segura"
 }
 
 private fun MenuEscopo.agentes(vm: OrbeViewModel, ajustes: Ajustes, emTela: Skin, agentesPc: List<AgenteInfo>, cartao: (Skin) -> ChavePrevia) {

@@ -275,9 +275,13 @@ fun Menu(lista: TransformingLazyColumnState, margem: Dp, conteudo: MenuEscopo.()
 /**
  * O fundo do menu. No PC o app é vidro sobre o papel de parede borrado pelo
  * niri; a ponte manda o papel em poucas cores, e aqui elas viram o borrão,
- * com o fundo do tema a 58% por cima, como no Conteudo.qml. Sem papel (outro
- * sistema, ponte antiga), o clarão do tema no alto.
+ * escurecido por preto ([VIDRO]): o cinza do tema, como no Conteudo.qml,
+ * lavava as cores e tirava o preto da tela AMOLED. Sem papel (outro sistema,
+ * ponte antiga), o clarão do tema no alto.
  */
+/** quanto o preto do vidro cobre o borrão do papel */
+private const val VIDRO = 0.62f
+
 @Composable
 fun FundoVidro(modifier: Modifier = Modifier) {
     val tema = LocalTema.current
@@ -285,7 +289,7 @@ fun FundoVidro(modifier: Modifier = Modifier) {
     Canvas(modifier.fillMaxSize()) {
         if (borrao != null) {
             drawImage(borrao, dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()), filterQuality = FilterQuality.Low)
-            drawRect(tema.fundo.alfa(0.58f))
+            drawRect(Color.Black.alfa(VIDRO))
         } else {
             drawRect(tema.fundo)
             drawRect(

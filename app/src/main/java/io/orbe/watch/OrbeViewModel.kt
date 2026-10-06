@@ -50,14 +50,19 @@ data class Aparencia(
     val tema: Tema = Tema.Padrao,
     /** a instância em tela, num orbe de agente com instâncias (Instancias); 0 nos outros */
     val instancia: Int = 0,
-    /** o fundo do menu também atrás dos orbes */
+    /** o fundo do menu também atrás dos orbes (pedido nos ajustes, e com o papel de parede do PC) */
     val fundo: Boolean = true,
 ) {
     /** A cor da figura e a do anel: a da instância, ou as do tema. */
     fun corFigura(): FloatArray = Instancias.cores[Instancias.cor(instancia)] ?: tema.accent.rgb()
     fun corAnel(): FloatArray = Instancias.cores[Instancias.cor(instancia)] ?: tema.anel.rgb()
-    /** O tom da massa escura da figura: o fundo do tema sobre o vidro, como nas miniaturas do menu; preto sem ele. */
-    fun corFundo(): FloatArray = if (fundo) tema.fundo.rgb() else floatArrayOf(0f, 0f, 0f)
+    /** O tom da massa escura da figura: preto, com ou sem o fundo (o vidro escurece o papel com preto). */
+    fun corFundo(): FloatArray = floatArrayOf(0f, 0f, 0f)
+
+    companion object {
+        /** o véu preto sobre o vidro na página do orbe, para o fundo não competir com ele; o menu fica sem */
+        const val ESCURO = 0.55f
+    }
 }
 
 class OrbeViewModel(app: Application) : AndroidViewModel(app) {
@@ -177,8 +182,10 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
         val tema = pc?.let { Tema.de(it.tema, it.papel) } ?: Tema.Padrao
         val skin = Skin.de(if (a.seguirPc && pc != null) pc.orbe.skin else a.skin)
         val instancia = if (temInstancias(agenteDe(skin, a))) a.instancia.coerceAtLeast(0) else 0
-        return if (a.seguirPc && pc != null) Aparencia(skin, pc.orbe.glitch, pc.orbe.glitch, tema, instancia, a.fundo)   // no PC as linhas vêm com o glitch
-        else Aparencia(skin, a.glitch, a.linhas, tema, instancia, a.fundo)
+        // sem o papel de parede não há vidro a pôr atrás do orbe: ele fica no preto
+        val fundo = a.fundo && tema.papel.isNotEmpty()
+        return if (a.seguirPc && pc != null) Aparencia(skin, pc.orbe.glitch, pc.orbe.glitch, tema, instancia, fundo)   // no PC as linhas vêm com o glitch
+        else Aparencia(skin, a.glitch, a.linhas, tema, instancia, fundo)
     }
 
     /** Leva os ajustes para a cena (quem desenha lê dela). */
@@ -274,7 +281,7 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Escolher o avatar no relógio solta o orbe do PC: fica o que o relógio escolheu. */
-    fun skin(s: Skin) = mudarSinc { it.copy(seguirPc = false, skin = s.id, instancia = 0, glitch = aparencia.value.glitch, linhas = aparencia.value.linhas) }
+    fun skin(s: Skin) = mudarSinc { it.copy(seguirPc = false, skin = s.id, instancia = it.instanciaDe(s), glitch = aparencia.value.glitch, linhas = aparencia.value.linhas) }
 
     fun glitch(v: Boolean) = mudarSinc { it.copy(seguirPc = false, glitch = v, linhas = aparencia.value.linhas, skin = aparencia.value.skin.id) }
 
@@ -282,15 +289,21 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun seguirPc(v: Boolean) = mudarSinc { it.copy(seguirPc = v) }
 
-    /** Rolou a lista para outra skin: como escolher no menu, solta o orbe do PC; o orbe novo entra pela instância 0. */
+    /**
+     * Rolou a lista para outra skin: como escolher no menu, solta o orbe do PC;
+     * o orbe novo entra pela instância em que ficou.
+     */
     fun girar(s: Skin) {
         val a = _ajustes.value
-        if (a.seguirPc) mudarSinc { it.copy(seguirPc = false, skin = s.id, instancia = 0, glitch = aparencia.value.glitch, linhas = aparencia.value.linhas) }
-        else mudar { it.copy(skin = s.id, instancia = 0) }        // a skin em tela não vai ao PC, só o agente dela
+        if (a.seguirPc) mudarSinc { it.copy(seguirPc = false, skin = s.id, instancia = it.instanciaDe(s), glitch = aparencia.value.glitch, linhas = aparencia.value.linhas) }
+        else mudar { it.copy(skin = s.id, instancia = it.instanciaDe(s)) }        // a skin em tela não vai ao PC, só o agente dela
     }
 
-    /** Dois dedos levaram a outra instância do orbe do Claude: a sessão do PC que ele mostra. */
-    fun instancia(k: Int) = mudar { it.copy(instancia = k.coerceAtLeast(0)) }
+    /** Dois dedos levaram a outra instância do orbe da [skin]: a sessão do PC que ele mostra, guardada para a volta. */
+    fun instancia(k: Int, skin: Skin = aparencia.value.skin) = mudar {
+        val i = k.coerceAtLeast(0)
+        it.copy(instancia = i, instancias = it.instancias + (skin.id to i))
+    }
 
     /** O fundo do menu atrás dos orbes. */
     fun fundo(v: Boolean) = mudarSinc { it.copy(fundo = v) }
@@ -389,7 +402,10 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
     fun saiu() {
         naTela = false
         pararEscuta()
-        toqueCancelado()
+        // fora da tela, os toques contados não valem mais
+        contagem?.cancel()
+        toques = 0
+        largar()
         // com um pedido esperando a resposta, a ponte fica: a resposta traz o orbe de volta
         if (pedidoNoAr()) esperarAoFundo() else soltarPonte()
     }
@@ -526,13 +542,20 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
         agenteEnviado = null
         vagaEnviada = null
         orbeEnviado = null
-        mudar { it.copy(pc = bruto) }
+        mudar { it.copy(pc = comPapel(ola, bruto, it.pc)) }
         // os ajustes daqui vão ao PC; se os de lá forem mais novos, a ponte devolve os dela
         ponte.enviar(Protocolo.ajustes(_ajustes.value.sincronia()))
         enviarAgente()
     }
 
-    private fun configDaPonte(ola: Ola, bruto: String) = mudar { it.copy(pc = bruto) }
+    private fun configDaPonte(ola: Ola, bruto: String) = mudar { it.copy(pc = comPapel(ola, bruto, it.pc)) }
+
+    /** O olá a guardar: se a ponte veio sem o papel de parede (o PC sem o Pillow, outro sistema), fica o de antes. */
+    private fun comPapel(ola: Ola, bruto: String, antes: String): String {
+        if (ola.papel.isNotEmpty()) return bruto
+        val papel = Protocolo.ola(antes)?.papel.orEmpty()
+        return if (papel.isEmpty()) bruto else Protocolo.guardar(ola.copy(papel = papel))
+    }
 
     /** A resposta em voz: a taxa do áudio que vem, o fim dela, ou o corte. */
     private fun vozDaPonte(arg: String) {
@@ -556,12 +579,15 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun live(v: Boolean) = mudarSinc { it.copy(live = v) }
 
-    /** A ação seguinte, em roda, para [n] toques (1 a 4). */
-    fun proximaAcao(n: Int) = mudarSinc { a ->
-        val l = a.toques.toMutableList()
-        if (n - 1 !in l.indices) return@mudarSinc a
-        l[n - 1] = AcaoToque.entries[(l[n - 1].ordinal + 1) % AcaoToque.entries.size]
-        a.copy(toques = l)
+    /** A ação seguinte, em roda, para [n] toques curtos (1 a 4). */
+    fun proximaAcao(n: Int) = mudarSinc { a -> a.copy(toques = proxima(a.toques, n, AcaoToque.CURTAS)) }
+
+    /** A ação seguinte, em roda, para [n] toques com o último segurado (1 a 4). */
+    fun proximaSegurar(n: Int) = mudarSinc { a -> a.copy(segurar = proxima(a.segurar, n, AcaoToque.entries)) }
+
+    private fun proxima(l: List<AcaoToque>, n: Int, roda: List<AcaoToque>): List<AcaoToque> {
+        if (n - 1 !in l.indices) return l
+        return l.toMutableList().also { it[n - 1] = roda[(roda.indexOf(it[n - 1]) + 1) % roda.size] }
     }
 
     /** Pede à ponte as sessões passadas do agente do orbe em tela. */
@@ -600,23 +626,30 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
 
     // ── toque no orbe ──
     //
-    // Segurar é segurar para falar: o "touch down" vai quando fica claro que o
-    // dedo não está só arrastando a tela para o menu (como o orbe.qml faz
-    // destravado para mover), e o daemon fecha a fala no "touch up". Os toques
-    // curtos são contados aqui, numa janela, e viram comandos (toquesCurtos).
+    // Os toques são contados aqui, numa janela que pausa com o dedo na tela.
+    // Soltos todos curtos, viram a ação de [Ajustes.toques]; o último segurado,
+    // a de [Ajustes.segurar]. Falar é segurar para falar: o "touch down" vai
+    // quando fica claro que o dedo não está só arrastando a tela para o menu
+    // (como o orbe.qml faz destravado para mover), e o daemon fecha a fala no
+    // "touch up".
 
     private val preRolo = ArrayList<ByteArray>()     // a fala desde que o dedo encostou
     private var transmitindo = false
     private var segurando = false                    // "touch down" enviado, falta o "touch up"
     private var dedo = false                         // dedo no orbe: a escuta espera ele sair
 
-    /** Dedo encostou: os olhos vão para ele e o microfone já começa a guardar. */
+    /**
+     * Dedo encostou: a janela dos toques espera ele sair, os olhos vão para ele
+     * e, se segurá-lo for falar, o microfone já começa a guardar.
+     */
     fun toqueBaixo(x: Float, y: Float, podeGravar: Boolean) {
         dedo = true
+        contagem?.cancel()
         desligarMicDaEscuta()           // o dedo assume a fala; a escuta volta quando ele sair
         olhar(x, y)
         val lig = ligacao.value
-        if (podeGravar && _ajustes.value.microfone && lig is Ligacao.Conectada && lig.microfone) {
+        val fala = _ajustes.value.segura(toques + 1) == AcaoToque.FALAR
+        if (fala && podeGravar && _ajustes.value.microfone && lig is Ligacao.Conectada && lig.microfone) {
             synchronized(trava) {
                 preRolo.clear()
                 transmitindo = false
@@ -640,8 +673,17 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Parado além do tempo de segurar: é segurar para falar. */
-    fun toqueSegurou() {
+    /** Parado além do tempo de segurar: o último dos toques contados, segurado ([Ajustes.segurar]). */
+    fun toqueSegurou(podeGravar: Boolean) {
+        val n = toques + 1
+        toques = 0
+        val acao = _ajustes.value.segura(n)
+        if (acao != AcaoToque.FALAR) {
+            soltarMicrofone()
+            mostrarToque()
+            executar(acao, podeGravar)
+            return
+        }
         altoFalante.cortar()            // quem fala por cima não espera a rede para o orbe calar
         segurando = true
         cena.toque = true
@@ -660,13 +702,7 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
     /** Solto antes de andar e antes do tempo de segurar: toque curto, contado. */
     fun toqueCurto(podeGravar: Boolean) {
         largar()
-        // o dedo já saiu: o orbe ainda cresce um instante, para o toque ser visto
-        cena.toque = true
-        viewModelScope.launch {
-            delay(140)
-            if (!segurando) cena.toque = false
-        }
-        contagem?.cancel()
+        mostrarToque()
         // chegou ao maior número de toques que faz algo: não espera outro
         val teto = _ajustes.value.maisToques()
         if (teto == 0) {
@@ -676,25 +712,39 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
         if (++toques >= teto) {
             val n = toques
             toques = 0
-            toquesCurtos(n, podeGravar)
+            executar(_ajustes.value.toque(n), podeGravar)
             return
         }
+        esperarToques(podeGravar)
+    }
+
+    /** A janela dos toques corre: sem outro dedo nela, os contados viram a ação deles. */
+    private fun esperarToques(podeGravar: Boolean) {
+        contagem?.cancel()
         contagem = viewModelScope.launch {
             delay(JANELA_TOQUES)
             val n = toques
             toques = 0
-            toquesCurtos(n, podeGravar)
+            executar(_ajustes.value.toque(n), podeGravar)
         }
     }
 
-    /** [n] toques curtos: a ação escolhida para eles ([Ajustes.toques]). */
-    private fun toquesCurtos(n: Int, podeGravar: Boolean) {
-        when (_ajustes.value.toque(n)) {
+    /** O dedo já saiu (ou a ação não é falar): o orbe ainda cresce um instante, para o toque ser visto. */
+    private fun mostrarToque() {
+        cena.toque = true
+        viewModelScope.launch {
+            delay(140)
+            if (!segurando) cena.toque = false
+        }
+    }
+
+    private fun executar(acao: AcaoToque, podeGravar: Boolean) {
+        when (acao) {
             AcaoToque.ABRIR -> toqueSessao(live = false, podeGravar)
             AcaoToque.LIVE -> toqueSessao(live = true, podeGravar)
             AcaoToque.ENCERRAR -> encerrar()
             AcaoToque.HISTORICO -> abrirHistorico()
-            AcaoToque.NADA -> Unit
+            AcaoToque.FALAR, AcaoToque.NADA -> Unit
         }
     }
 
@@ -755,15 +805,25 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
     /** Dedo solto depois de segurar: fim da fala. */
     fun toqueSolto() = largar()
 
-    /** Virou arrasto (ou o app saiu da tela): nada vai para o daemon além de fechar o que abriu. */
-    fun toqueCancelado() = largar()
+    /**
+     * Virou arrasto: nada vai para o daemon além de fechar o que abriu, e os
+     * toques contados antes voltam a esperar a janela.
+     */
+    fun toqueCancelado(podeGravar: Boolean) {
+        largar()
+        if (toques > 0) esperarToques(podeGravar)
+    }
 
-    private fun largar() {
+    private fun soltarMicrofone() {
         microfone.parar()
         synchronized(trava) {
             transmitindo = false
             preRolo.clear()
         }
+    }
+
+    private fun largar() {
+        soltarMicrofone()
         cena.toque = false
         cena.olharX = Double.NaN
         cena.olharY = Double.NaN
@@ -868,7 +928,7 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
     private companion object {
         /** quanto a ponte em casa espera o Wi-Fi acordar antes de sair pelo celular */
         const val ESPERA_WIFI = 4_000L
-        /** toques curtos dentro disto contam juntos; cada número tem a sua ação ([Ajustes.toques]) */
+        /** toques dentro disto contam juntos (com o dedo fora); cada número tem a sua ação ([Ajustes.toques], [Ajustes.segurar]) */
         const val JANELA_TOQUES = 400L
         /** com o orbe fora da tela, quanto a sessão escondida espera para contar como fechada */
         const val CONFIRMA_FECHOU = 2_000L
