@@ -1,14 +1,9 @@
 package io.orbe.watch.ui
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -18,12 +13,10 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.orbe.watch.gesto.AMOSTRAS
 import io.orbe.watch.gesto.ANTES
 import io.orbe.watch.gesto.Janela
-import io.orbe.watch.gesto.Perfil
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.ln
@@ -38,37 +31,23 @@ import kotlin.math.sqrt
  * tracejada) e a magnitude da forma afasta a curva do anel base. A aceleração
  * no anel de fora, o giro no de dentro; cada tentativa em traço fino, a média
  * em destaque e a última em claro. No arco de baixo, a força de cada tentativa
- * numa régua logarítmica; no meio, quantas e o limiar.
+ * numa régua logarítmica. O meio fica livre para a lente da Moldura.
  */
 @Composable
-fun GraficoPerfil(janelas: List<Janela>) {
+fun GraficoPerfil(janelas: List<Janela>, modifier: Modifier = Modifier) {
     val accent = Estilo.accent
     val texto = Estilo.texto
     val curvas = remember(janelas.size, janelas.lastOrNull()) {
         Curvas(janelas.map { magnitudes(it, 0) }, janelas.map { magnitudes(it, 1) })
     }
-    val perfil = remember(janelas.size, janelas.lastOrNull()) { Perfil.de(janelas) }
     val forcas = janelas.map { it.aceleracao + it.giro }
-    Box(Modifier.fillMaxWidth(0.86f).aspectRatio(1f), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxWidth().aspectRatio(1f)) {
-            val raio = min(size.width, size.height) / 2
-            // anéis: o de fora (aceleração) de 0,62 a 0,86 do raio, o de dentro (giro) de 0,36 a 0,58
-            anel(curvas.acel, raio * 0.62f, raio * 0.24f, accent, texto)
-            anel(curvas.giro, raio * 0.36f, raio * 0.22f, accent, texto)
-            pico(raio * 0.32f, raio * 0.9f, texto)
-            regua(forcas, raio * 0.95f, accent, texto)
-        }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Texto("PERFIL", Estilo.mono, cor = accent)
-            Texto("${janelas.size}", Estilo.grupo, cor = texto)
-            Texto(perfil?.let { "lim ${um2(it.limiar)}" } ?: "mín. 3", Estilo.mono, cor = texto.alfa(0.55f), alinhar = TextAlign.Center)
-        }
-    }
-    if (forcas.isNotEmpty()) {
-        Texto(
-            "ACEL fora · GIRO dentro · força ${um1(forcas.min())} a ${um1(forcas.max())}",
-            Estilo.mono, cor = texto.alfa(0.55f), alinhar = TextAlign.Center,
-        )
+    Canvas(modifier.aspectRatio(1f)) {
+        val raio = min(size.width, size.height) / 2
+        // anéis: o de fora (aceleração) de 0,62 a 0,86 do raio, o de dentro (giro) de 0,40 a 0,58
+        anel(curvas.acel, raio * 0.62f, raio * 0.24f, accent, texto)
+        anel(curvas.giro, raio * 0.40f, raio * 0.18f, accent, texto)
+        pico(raio * 0.38f, raio * 0.9f, texto)
+        regua(forcas, raio * 0.95f, accent, texto)
     }
 }
 
@@ -152,6 +131,3 @@ private fun DrawScope.regua(forcas: List<Float>, r: Float, accent: Color, texto:
         )
     }
 }
-
-private fun um1(v: Float) = "%.1f".format(v).replace('.', ',')
-private fun um2(v: Float) = "%.2f".format(v).replace('.', ',')
