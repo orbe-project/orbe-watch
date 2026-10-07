@@ -36,11 +36,6 @@ class Batida(
     var fracaMin: Float = FRACA_MIN,
     /** a partir deste pico, forte (entre a fraca mais forte e o estalo mais fraco da calibração) */
     var forteMin: Float = FORTE_MIN,
-    /**
-     * A postura da calibração (a direção da gravidade no relógio, com o braço
-     * erguido): a batida só conta a até [POSTURA_GRAUS] dela. Null: qualquer postura.
-     */
-    var postura: FloatArray? = null,
 ) {
     // a parte lenta da aceleração (filtro de primeira ordem): o que sobra é o tranco
     private var lx = 0f
@@ -125,15 +120,24 @@ class Batida(
         if (pendente != null && ms - ultimaMs > JUNTAR_MS) soltar()
     }
 
-    /** O relógio na postura da calibração (o braço acima da horizontal, como nas tentativas). */
+    /**
+     * O antebraço pelo menos [ELEVACAO_MIN_GRAUS] acima da horizontal (a posição
+     * de falar): x do relógio corre ao longo do antebraço e a gravidade nele
+     * cresce com a mão subindo (medido no relógio do Davi: 1 a 4 m/s² nos toques).
+     */
     private fun naPostura(): Boolean {
-        val p = postura ?: return true
-        val n = sqrt(lx * lx + ly * ly + lz * lz) * sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2])
-        if (n < 1e-3f) return true
-        return (lx * p[0] + ly * p[1] + lz * p[2]) / n >= COS_POSTURA
+        val g = sqrt(lx * lx + ly * ly + lz * lz)
+        return g > 1f && lx / g >= SEN_ELEVACAO
     }
 
     private fun contar(ms: Long, f: Forca) {
+        // o estalo começa com a pressão do dedo (um tranco leve) e estala logo
+        // depois: o forte que chega em seguida a uma fraca sozinha toma o lugar dela
+        if (f == Forca.FORTE && pendente == Forca.FRACA && vezes == 1 && ms - ultimaMs <= PRE_ESTALO_MS) {
+            pendente = Forca.FORTE
+            ultimaMs = ms
+            return
+        }
         if (pendente != null && pendente != f) soltar()
         pendente = f
         vezes++
@@ -168,20 +172,27 @@ class Batida(
         private const val GIRO_QUIETO = 1.2f     // rad/s: girando o pulso não é batida
         private const val LARGURA_MAX = 4        // amostras acima da metade do pico (~40 ms)
         private const val VOLTA_AMOSTRAS = 12    // ~120 ms para voltar ao quieto
-        private const val REFRATARIO_MS = 120L   // o rebote do tranco não conta como outra
+        private const val REFRATARIO_MS = 80L    // o rebote do tranco não conta como outra (curto: o estalo vem logo depois da pressão)
+        private const val PRE_ESTALO_MS = 350L   // a pressão do dedo antes do estalo
         private const val ISOLADO_MS = 500L      // sem outro tranco antes disso: o primeiro de um comando
         private const val SURDO_MS = 600L        // depois de uma rajada, um tempo sem contar
-        private const val COS_POSTURA = 0.643f   // cos 50°: o quanto o braço pode fugir da postura da calibração
+        const val ELEVACAO_MIN_GRAUS = 15
+        private const val SEN_ELEVACAO = 0.2588f  // sen 15°
         const val JUNTAR_MS = 750L               // até aqui, a segunda da mesma força soma (os pares do Davi: 650 a 1090 ms)
     }
 }
 
 /** Calibração: fraca no mínimo das fracas medidas com margem; forte entre a fraca mais forte e o estalo mais fraco. */
 fun limiaresBatida(fracas: List<Float>, fortes: List<Float>): Pair<Float, Float> {
-    val fracaMin = (fracas.minOrNull() ?: Batida.FRACA_MIN / MARGEM) * MARGEM
+    val fracaMin = ((fracas.minOrNull() ?: Batida.FRACA_MIN / MARGEM_BATIDA) * MARGEM_BATIDA).coerceAtLeast(PISO_FRACA)
     val fracaMax = fracas.maxOrNull() ?: Batida.FRACA_MIN
     val forteMenor = fortes.minOrNull() ?: Batida.FORTE_MIN
     // a meio caminho (geométrico) entre as duas; sem separação, logo acima da fraca mais forte
     val forteMin = if (forteMenor > fracaMax) sqrt(fracaMax * forteMenor) else fracaMax * 1.15f
-    return fracaMin.coerceAtLeast(0.5f) to forteMin.coerceAtLeast(fracaMin * 1.2f)
+    return fracaMin to forteMin.coerceAtLeast(fracaMin * 1.2f)
 }
+
+/** a batida precisa de 85% da tentativa mais leve da calibração (com 60%, como a sacudida, pegava o pulso parado) */
+const val MARGEM_BATIDA = 0.85f
+/** nenhum limiar abaixo disto (m/s²): é o tremor do pulso parado */
+const val PISO_FRACA = 0.7f

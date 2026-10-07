@@ -99,7 +99,6 @@ fun OrbeApp(
         ligado = ajustes.batidas && calibrando == null,
         fracaMin = if (ajustes.batidaFraca > 0f) ajustes.batidaFraca else Batida.FRACA_MIN,
         forteMin = if (ajustes.batidaForte > 0f) ajustes.batidaForte else Batida.FORTE_MIN,
-        postura = ajustes.batidaPostura.takeIf { it.size == 3 }?.toFloatArray(),
         aoDetectar = vm::avisarBatida,
     ) { c ->
         vm.batida((if (c.forca == Forca.FORTE) 2 else 0) + (if (c.vezes >= 2) 1 else 0), podeGravar())
@@ -216,8 +215,8 @@ fun OrbeApp(
                     emUso = if (forca == Forca.FRACA) (if (ajustes.batidaFraca > 0f) "%.1f m/s²".format(ajustes.batidaFraca) else "o padrão")
                     else (if (ajustes.batidaForte > 0f) "%.1f m/s²".format(ajustes.batidaForte) else "o padrão"),
                     redonda,
-                    salvar = { p, g ->
-                        if (forca == Forca.FRACA) vm.calibrarFraca(p, g) else vm.calibrarForte(p, g)
+                    salvar = { p, _ ->
+                        if (forca == Forca.FRACA) vm.calibrarFraca(p) else vm.calibrarForte(p)
                         calibrando = null
                     },
                     padrao = {
@@ -274,7 +273,7 @@ private const val GIRO_POR_PASSO = 90f
  */
 @Composable
 private fun BatidasNoPulso(
-    ligado: Boolean, fracaMin: Float, forteMin: Float, postura: FloatArray?,
+    ligado: Boolean, fracaMin: Float, forteMin: Float,
     aoDetectar: (forte: Boolean) -> Unit, aoComando: (Comando) -> Unit,
 ) {
     val ctx = LocalContext.current
@@ -283,9 +282,9 @@ private fun BatidasNoPulso(
     val aviso = remember { arrayOf(aoDetectar) }
     aviso[0] = aoDetectar
     val dono = LocalLifecycleOwner.current
-    DisposableEffect(ligado, fracaMin, forteMin, postura?.toList(), dono) {
+    DisposableEffect(ligado, fracaMin, forteMin, dono) {
         if (!ligado) return@DisposableEffect onDispose { }
-        val batida = Batida(fracaMin, forteMin, postura)
+        val batida = Batida(fracaMin, forteMin)
         val principal = Handler(Looper.getMainLooper())
         val sensores = ctx.getSystemService(SensorManager::class.java)
         val ouvinte = object : SensorEventListener {
