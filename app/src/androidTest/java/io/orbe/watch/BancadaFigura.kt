@@ -176,6 +176,55 @@ class BancadaFigura {
         }
     }
 
+    /**
+     * As figuras de imagem como no cartão redondo do menu (a MiniCena): parado,
+     * sem glitch, cabendo no disco do cartão. Grava a máscara de cada uma, para
+     * comparar o tamanho do Rei dos Ratos com o dos outros.
+     */
+    @Test
+    fun cartoes() {
+        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
+        val egl = abrirEgl()
+        try {
+            val of = Oficina(ctx)
+            val mascara = alvo()
+            val quad = quadrado()
+            val w = lado / ctx.resources.displayMetrics.density.toDouble()
+            val pasta = File(ctx.filesDir, "bancada").apply { mkdirs() }
+            for (skin in listOf(Skin.HUMANA, Skin.OLHO, Skin.SERAFIM_GRAVURA)) {
+                val figura = of.figura(skin)
+                val atlas = of.textura(skin)
+                assertTrue("o ${skin.id} não compilou", figura != null && atlas != 0)
+                val fig = Figura(skin).apply { glitch = false; varredura = false; disco = w / 2 - 2; zoom = skin.cartao }
+                java.util.Arrays.fill(fig.mix, 0.0)
+                fig.mix[Estado.IDLE] = 1.0
+                for (i in 0 until 60) {
+                    fig.avancar(1.0 / 30)
+                    fig.montar(w, w, w / 2, w / 2, w, w)
+                }
+                GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, mascara[1])
+                GLES30.glViewport(0, 0, lado, lado)
+                GLES30.glClearColor(0f, 0f, 0f, 0f)
+                GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
+                GLES30.glDisable(GLES30.GL_BLEND)
+                GLES30.glUseProgram(figura!!.id)
+                figura.aplicar(fig.fx)
+                figura.v1("qt_Opacity", 1f)
+                figura.v4("uvT", 1f, 1f, 0f, 0f)
+                GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
+                GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, atlas)
+                figura.amostrador("arte", 0)
+                figura.amostrador("atlas", 0)
+                GLES30.glBindVertexArray(quad)
+                GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
+                GLES30.glFinish()
+                salvar(mascara[1], File(pasta, "cartao_${skin.id}.png"))
+            }
+        } finally {
+            EGL14.eglMakeCurrent(egl[0] as android.opengl.EGLDisplay, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
+        }
+    }
+
     /** Falando, com a voz subindo e descendo como numa fala (as peças levam os chutes das sílabas). */
     private fun falar(fig: Figura, t: Double) {
         java.util.Arrays.fill(fig.mix, 0.0)

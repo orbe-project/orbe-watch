@@ -21,13 +21,19 @@ enum class Skin(
     val topo: Float,
     /** o atlas é lido com esta redução: a figura no relógio é bem menor que o recorte */
     val reducao: Int = 1,
+    /**
+     * a escala nos cartões do menu: o Rei dos Ratos é uma massa densa e redonda
+     * que enchia o cartão (0,75 do raio e 35% da área, medidos no render; o
+     * Seraphim fica em 0,62 e 20%)
+     */
+    val cartao: Double = 1.0,
 ) {
     ANEL("anel", "Anel de energia", "anel.frag", emptyMap(), "anel_atlas.png", floatArrayOf(1f, 1f, 1f), 0.35f, 0.412f),
     SERAFIM_GRAVURA("serafim_gravura", "Seraphim (gravura)", "imagem.frag", mapOf("IMG" to 1), "serafim_gravura.png", floatArrayOf(1.15f, 1.3f, 1.4f), 0.38f, 0.355f),
     OFANIM("ofanim", "Ophanim", "figura.frag", mapOf("SKIN" to 0), null, floatArrayOf(1.55f, 1.55f, 1.25f), 0.39f, 0.345f),
     OFANIM_ALADO("ofanim_alado", "Ophanim com asas", "figura.frag", mapOf("SKIN" to 1), null, floatArrayOf(2.1f, 1.55f, 2.08f), 0.29f, 0.277f),
     OLHO("olho", "Paranoia", "imagem.frag", mapOf("IMG" to 2), "olho.png", floatArrayOf(1.1f, 1.36f, 1.36f), 0.46f, 0.38f),
-    HUMANA("humana", "Rei dos Ratos", "imagem.frag", mapOf("IMG" to 3), "humana.png", floatArrayOf(1.18f, 1.13f, 1.27f), 0.43f, 0.40f),
+    HUMANA("humana", "Rei dos Ratos", "imagem.frag", mapOf("IMG" to 3), "humana.png", floatArrayOf(1.18f, 1.13f, 1.27f), 0.43f, 0.40f, cartao = 0.82),
     /** o Seraphim nas cores da gravura (papel claro, tinta escura); no fim, para não deslocar a ordem de sempre */
     SERAFIM_POSITIVO("serafim_positivo", "Seraphim (positivo)", "imagem.frag", mapOf("IMG" to 1, "POSITIVO" to 1), "serafim_positivo.png", floatArrayOf(1.15f, 1.3f, 1.4f), 0.38f, 0.355f);
 

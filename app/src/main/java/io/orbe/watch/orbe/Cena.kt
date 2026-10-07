@@ -317,6 +317,7 @@ class MiniCena(skinInicial: Skin) : Cena {
             figura.raioFixo = raio
             // os cartões são redondos: a figura cabe no disco deles, não só no quadrado
             figura.disco = if (raio > 0) -1.0 else min(w, h) / 2 - 2
+            figura.zoom = if (raio > 0) 1.0 else sk.cartao
             cor.copyInto(figura.cor)
             corFundo.copyInto(figura.corFundo)
             figura.avancar(d)
