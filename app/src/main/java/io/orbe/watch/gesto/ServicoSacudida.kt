@@ -13,7 +13,6 @@ import android.database.ContentObserver
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
-import android.hardware.SensorEventListener2
 import android.hardware.SensorManager
 import android.os.Handler
 import android.os.IBinder
@@ -45,14 +44,8 @@ import kotlinx.coroutines.launch
  * acende o LCD secundário ao inclinar): aí a janela dura [JANELA_ESCURA_MS] e o
  * orbe abre acendendo a tela. Uma sacudida abre o orbe já ouvindo; duas são do
  * HinaWatch e passam. Com a chave do menu desligada o serviço se encerra.
- *
- * No escuro (tela apagada, só o LCD secundário) acelerômetro e giroscópio
- * seguem ligados, mas em lote: o sensor guarda as leituras na fila dele sem
- * acordar a CPU. Quando a inclinação acorda (a própria sacudida a dispara), o
- * lote é descarregado e a sacudida dos últimos segundos abre o orbe direto,
- * sem precisar inclinar antes.
  */
-class ServicoSacudida : Service(), SensorEventListener2 {
+class ServicoSacudida : Service(), SensorEventListener {
     private lateinit var sensores: SensorManager
     private lateinit var energia: PowerManager
     private val maos = Handler(Looper.getMainLooper())
@@ -63,9 +56,6 @@ class ServicoSacudida : Service(), SensorEventListener2 {
     private var janelaAberta = false
     private var fimJanela = 0L            // uptime em que a janela aberta fecha
     private var avisouArmado = false
-    // no escuro: os sensores em lote; descarregando: o lote vem e depois a janela abre ao vivo
-    private var escuro = false
-    private var descarregando: Pair<String, Long>? = null
     private var gy = 0f
     private var gz = 0f
     private val sacudida = Sacudida()
@@ -145,7 +135,7 @@ class ServicoSacudida : Service(), SensorEventListener2 {
         )
         Log.i(TAG, "ativo: giroscópio=${giro != null} inclinação=${inclinacao?.name}")
         // criado com a tela já acesa (a reinstalação, a chave ligada no menu): o SCREEN_ON não vem
-        if (energia.isInteractive) abrirJanela("tela já acesa") else entrarNoEscuro()
+        if (energia.isInteractive) abrirJanela("tela já acesa")
     }
 
     /**
@@ -194,15 +184,6 @@ class ServicoSacudida : Service(), SensorEventListener2 {
         val g = giro ?: return
         // com o orbe na frente a sacudida é a do sair (MainActivity): ler aqui só gastava
         if (orbeNaFrente) { fecharJanela(); return }
-        if (escuro) {
-            // o que o sensor guardou no escuro vem antes: a própria sacudida pode ter acordado
-            escuro = false
-            descarregando = motivo to ms
-            acordado?.acquire(ms + 2_000)
-            Log.d(TAG, "descarregando o lote do escuro ($motivo)")
-            if (sensores.flush(this)) maos.postDelayed(aoVivo, DESCARGA_MAX_MS) else aoVivo.run()
-            return
-        }
         if (!janelaAberta) {
             sacudida.zerar()
             avisouArmado = false
@@ -221,53 +202,24 @@ class ServicoSacudida : Service(), SensorEventListener2 {
     }
 
     private fun fecharJanela() {
-        if (janelaAberta) {
-            if (!sacudida.armado) Log.d(TAG, "não armou; maior pico ignorado: %.1f".format(sacudida.maxAntesDeArmar))
-            sensores.unregisterListener(this)
-            janelaAberta = false
-            fimJanela = 0L
-            maos.removeCallbacks(fechar)
-            acordado?.let { if (it.isHeld) it.release() }
-            Log.d(TAG, "janela fechada")
-        }
-        // tela apagada: os sensores seguem em lote, sem acordar a CPU
-        if (!energia.isInteractive && !orbeNaFrente) entrarNoEscuro()
-    }
-
-    private fun entrarNoEscuro() {
-        if (escuro || descarregando != null) return
-        val g = giro ?: return
-        sensores.unregisterListener(this)
-        sacudida.zerar()
-        avisouArmado = false
-        sensores.registerListener(this, g, SensorManager.SENSOR_DELAY_GAME, LOTE_US)
-        acel?.let { sensores.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME, LOTE_US) }
-        escuro = true
-        Log.d(TAG, "no escuro: sensores em lote")
-    }
-
-    /** O lote acabou de chegar (ou demorou demais): a janela abre ao vivo, como antes. */
-    private val aoVivo = Runnable {
-        val (motivo, ms) = descarregando ?: return@Runnable
-        descarregando = null
+        if (!janelaAberta) return
+        if (!sacudida.armado) Log.d(TAG, "não armou; maior pico ignorado: %.1f".format(sacudida.maxAntesDeArmar))
         sensores.unregisterListener(this)
         janelaAberta = false
-        if (energia.isInteractive || motivo.startsWith("pulso")) abrirJanela(motivo, ms)
-        else entrarNoEscuro()
+        fimJanela = 0L
+        maos.removeCallbacks(fechar)
+        acordado?.let { if (it.isHeld) it.release() }
+        Log.d(TAG, "janela fechada")
     }
 
-    override fun onFlushCompleted(sensor: Sensor) {
-        if (sensor.type == Sensor.TYPE_GYROSCOPE && descarregando != null) {
-            maos.removeCallbacks(aoVivo)
-            maos.post(aoVivo)
-        }
-    }
-
-    /** O orbe entrou ou saiu da frente: saindo com a tela acesa, a sacudida volta a ser lida já. */
+    /**
+     * O orbe entrou ou saiu da frente. Na frente, a sacudida é a do sair
+     * (MainActivity) e ler aqui só gastava; saindo com a tela acesa, a janela
+     * reabre já (antes ela só voltava no próximo acender da tela).
+     */
     private fun mudouFrente() {
         if (orbeNaFrente) fecharJanela()
         else if (energia.isInteractive) abrirJanela("o orbe saiu da frente")
-        else fecharJanela()
     }
 
     override fun onSensorChanged(event: SensorEvent) {
@@ -289,12 +241,8 @@ class ServicoSacudida : Service(), SensorEventListener2 {
                 // durante a calibração o gesto é medido pela tela e não abre nada; logo
                 // depois de sair do orbe pela sacudida, a volta do pulso não o reabre
                 val acabouDeSair = SystemClock.uptimeMillis() - saiuEm < SAIU_MS
-                // do lote do escuro, só a sacudida destes últimos instantes (não a de minutos atrás)
-                val recente = SystemClock.elapsedRealtimeNanos() - event.timestamp < RECENTE_NS
                 // com o orbe na frente, a sacudida é a do sair (MainActivity), não a de abrir
-                if (gesto == Gesto.UMA && !recente) Log.i(TAG, "sacudida antiga do lote: ignorada")
-                if (gesto == Gesto.UMA && recente && !calibrando && !acabouDeSair && !orbeNaFrente) {
-                    if (descarregando != null) Log.i(TAG, "sacudida achada no lote do escuro")
+                if (gesto == Gesto.UMA && !calibrando && !acabouDeSair && !orbeNaFrente) {
                     abrirOrbe()
                     fecharJanela()
                 }
@@ -344,12 +292,7 @@ class ServicoSacudida : Service(), SensorEventListener2 {
 
     override fun onDestroy() {
         instancia = null
-        maos.removeCallbacks(aoVivo)
-        descarregando = null
-        sensores.unregisterListener(this)
-        janelaAberta = false
-        escuro = false
-        acordado?.let { if (it.isHeld) it.release() }
+        fecharJanela()
         escopo.cancel()
         maos.removeCallbacks(rearmar)
         inclinacao?.let { sensores.unregisterListener(pulso, it) }
@@ -392,12 +335,6 @@ class ServicoSacudida : Service(), SensorEventListener2 {
 
         /** o serviço em execução, para o orbe avisar quando entra e sai da frente */
         @Volatile private var instancia: ServicoSacudida? = null
-        /** quanto o sensor pode segurar as leituras no escuro antes de entregar */
-        private const val LOTE_US = 10_000_000
-        /** do lote, só vale a sacudida mais nova que isto */
-        private const val RECENTE_NS = 2_500_000_000L
-        /** se o fim da descarga não vier, a janela abre assim mesmo */
-        private const val DESCARGA_MAX_MS = 600L
 
         /** quando o orbe saiu pela sacudida para fora ([SystemClock.uptimeMillis]) */
         @Volatile var saiuEm = -SAIU_MS
