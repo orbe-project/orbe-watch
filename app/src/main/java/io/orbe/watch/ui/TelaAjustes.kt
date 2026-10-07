@@ -41,7 +41,7 @@ import io.orbe.watch.R
 import io.orbe.watch.dados.AgenteInfo
 import io.orbe.watch.dados.Ajustes
 import io.orbe.watch.dados.Ligacao
-import io.orbe.watch.gesto.Batida
+import io.orbe.watch.gesto.Janela
 import io.orbe.watch.gesto.Sacudida
 import io.orbe.watch.orbe.Estado
 import io.orbe.watch.orbe.Retrato
@@ -394,20 +394,16 @@ private fun MenuEscopo.gestos(vm: OrbeViewModel, ajustes: Ajustes, pedirMicrofon
     duas(listOf("Toque fraco", "Dois fracos", "Estalo", "Dois estalos").mapIndexed { i, nome ->
         @Composable { Linha(nome, subtitulo = ajustes.batidasAcoes[i].nome, ativo = ajustes.batidas, aoClicar = { vm.proximaBatida(i) }) }
     })
-    linha {
-        Linha(
-            "Calibrar o toque fraco",
-            subtitulo = if (ajustes.batidaFraca > 0f) "a partir de ${um(ajustes.batidaFraca)} m/s²" else "padrão: a partir de ${um(Batida.FRACA_MIN)} m/s²",
-            aoClicar = { calibrar(Calibracao.FRACA) },
-        )
-    }
-    linha {
-        Linha(
-            "Calibrar o estalo",
-            subtitulo = if (ajustes.batidaForte > 0f) "a partir de ${um(ajustes.batidaForte)} m/s²" else "padrão: a partir de ${um(Batida.FORTE_MIN)} m/s²",
-            aoClicar = { calibrar(Calibracao.FORTE) },
-        )
-    }
+    duas(listOf(
+        Triple("Calibrar o toque fraco", ajustes.batidaFracas, Calibracao.FRACA),
+        Triple("Calibrar o estalo", ajustes.batidaFortes, Calibracao.FORTE),
+        Triple("O que não é batida", ajustes.batidaNada, Calibracao.NADA),
+    ).map { (nome, guardado, tipo) ->
+        @Composable {
+            val n = Janela.lista(guardado).size
+            Linha(nome, subtitulo = if (n > 0) "$n exemplos" else "sem calibrar", aoClicar = { calibrar(tipo) })
+        }
+    })
 }
 
 /**

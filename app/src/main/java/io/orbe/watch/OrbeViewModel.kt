@@ -7,7 +7,8 @@ import android.os.Vibrator
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.orbe.watch.dados.AcaoToque
-import io.orbe.watch.gesto.limiaresBatida
+import io.orbe.watch.gesto.Janela
+import io.orbe.watch.ui.Calibracao
 import io.orbe.watch.dados.AgenteInfo
 import io.orbe.watch.dados.Ajustes
 import io.orbe.watch.dados.AltoFalante
@@ -403,21 +404,18 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun batidas(v: Boolean) = mudar { it.copy(batidas = v) }
 
-    /** Calibração da batida fraca: os picos das tentativas. Refaz o forte se ele já foi calibrado. */
-    fun calibrarFraca(picos: List<Float>) = mudar { a ->
-        val (fraca, _) = limiaresBatida(picos, emptyList())
-        val topo = picos.max()
-        val forte = if (a.batidaForte > 0f && a.batidaFracaTopo > 0f) a.batidaForte else 0f
-        a.copy(batidaFraca = fraca, batidaFracaTopo = topo, batidaForte = forte)
+    /** As calibrações das batidas: as janelas das tentativas de cada uma (o modelo sai delas). */
+    fun calibrarBatidas(tipo: Calibracao, janelas: List<Janela>) = mudar { a ->
+        val t = Janela.texto(janelas)
+        when (tipo) {
+            Calibracao.FRACA -> a.copy(batidaFracas = t)
+            Calibracao.FORTE -> a.copy(batidaFortes = t)
+            Calibracao.NADA -> a.copy(batidaNada = t)
+            else -> a
+        }
     }
 
-    fun calibrarForte(picos: List<Float>) = mudar { a ->
-        val fracas = if (a.batidaFracaTopo > 0f) listOf(a.batidaFraca / io.orbe.watch.gesto.MARGEM_BATIDA, a.batidaFracaTopo) else emptyList()
-        val (_, forte) = limiaresBatida(fracas, picos)
-        a.copy(batidaForte = forte)
-    }
-
-    fun batidasPadrao() = mudar { it.copy(batidaFraca = 0f, batidaFracaTopo = 0f, batidaForte = 0f) }
+    fun batidasPadrao() = mudar { it.copy(batidaFracas = "", batidaFortes = "", batidaNada = "") }
 
     /** Passos da lista de orbes pedidos pelas ações (+1 o seguinte, -1 o anterior); o OrbeApp leva à lista, como a coroa. */
     val passosLista = kotlinx.coroutines.flow.MutableSharedFlow<Int>(extraBufferCapacity = 1)

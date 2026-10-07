@@ -15,6 +15,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import io.orbe.watch.gesto.Batida
 import io.orbe.watch.gesto.Forca
 import io.orbe.watch.gesto.Comando
+import io.orbe.watch.gesto.Janela
+import io.orbe.watch.gesto.ModeloBatida
 import androidx.wear.compose.foundation.BasicSwipeToDismissBox
 import androidx.wear.compose.foundation.LocalSwipeToDismissBackgroundScrimColor
 import androidx.wear.compose.foundation.LocalSwipeToDismissContentScrimColor
@@ -95,10 +97,12 @@ fun OrbeApp(
 
     // as batidas, com o app aberto e fora das calibrações: fraca troca de orbe
     // (como a coroa), o estalo abre e fecha o live, dois fecham o chat
+    val modelo = remember(ajustes.batidaFracas, ajustes.batidaFortes, ajustes.batidaNada) {
+        ModeloBatida.de(Janela.lista(ajustes.batidaFracas), Janela.lista(ajustes.batidaFortes), Janela.lista(ajustes.batidaNada))
+    }
     BatidasNoPulso(
-        ligado = ajustes.batidas && calibrando == null,
-        fracaMin = if (ajustes.batidaFraca > 0f) ajustes.batidaFraca else Batida.FRACA_MIN,
-        forteMin = if (ajustes.batidaForte > 0f) ajustes.batidaForte else Batida.FORTE_MIN,
+        ligado = ajustes.batidas && calibrando == null && modelo.calibrado,
+        modelo = modelo,
         aoDetectar = vm::avisarBatida,
     ) { c ->
         vm.batida((if (c.forca == Forca.FORTE) 2 else 0) + (if (c.vezes >= 2) 1 else 0), podeGravar())
@@ -208,17 +212,17 @@ fun OrbeApp(
                     calibrando = null
                 },
             )
-            Calibracao.FRACA, Calibracao.FORTE -> {
-                val forca = if (calibrando == Calibracao.FRACA) Forca.FRACA else Forca.FORTE
+            Calibracao.FRACA, Calibracao.FORTE, Calibracao.NADA -> {
+                val tipo = calibrando!!
+                val n = Janela.lista(when (tipo) {
+                    Calibracao.FRACA -> ajustes.batidaFracas
+                    Calibracao.FORTE -> ajustes.batidaFortes
+                    else -> ajustes.batidaNada
+                }).size
                 TelaCalibracaoBatida(
-                    forca,
-                    emUso = if (forca == Forca.FRACA) (if (ajustes.batidaFraca > 0f) "%.1f m/s²".format(ajustes.batidaFraca) else "o padrão")
-                    else (if (ajustes.batidaForte > 0f) "%.1f m/s²".format(ajustes.batidaForte) else "o padrão"),
-                    minimo = if (forca == Forca.FRACA) 0.5f
-                    else if (ajustes.batidaFracaTopo > 0f) ajustes.batidaFracaTopo * 1.1f else 1.5f,
-                    redonda,
-                    salvar = { p, _ ->
-                        if (forca == Forca.FRACA) vm.calibrarFraca(p) else vm.calibrarForte(p)
+                    tipo, emUso = if (n > 0) "$n exemplos" else "sem calibrar", redonda,
+                    salvar = {
+                        vm.calibrarBatidas(tipo, it)
                         calibrando = null
                     },
                     padrao = {
@@ -275,7 +279,7 @@ private const val GIRO_POR_PASSO = 90f
  */
 @Composable
 private fun BatidasNoPulso(
-    ligado: Boolean, fracaMin: Float, forteMin: Float,
+    ligado: Boolean, modelo: ModeloBatida,
     aoDetectar: (forte: Boolean) -> Unit, aoComando: (Comando) -> Unit,
 ) {
     val ctx = LocalContext.current
@@ -284,9 +288,9 @@ private fun BatidasNoPulso(
     val aviso = remember { arrayOf(aoDetectar) }
     aviso[0] = aoDetectar
     val dono = LocalLifecycleOwner.current
-    DisposableEffect(ligado, fracaMin, forteMin, dono) {
+    DisposableEffect(ligado, modelo, dono) {
         if (!ligado) return@DisposableEffect onDispose { }
-        val batida = Batida(fracaMin, forteMin)
+        val batida = Batida(modelo)
         val principal = Handler(Looper.getMainLooper())
         val sensores = ctx.getSystemService(SensorManager::class.java)
         val ouvinte = object : SensorEventListener {
@@ -295,13 +299,11 @@ private fun BatidasNoPulso(
                 when (event.sensor.type) {
                     Sensor.TYPE_ACCELEROMETER -> {
                         batida.acel(event.timestamp / 1_000_000, x, y, z)
-                        for (m in batida.tirarMedidas()) {
-                            Log.i("OrbeBatida", "pico %.1f giro %.1f largura %d %s gravidade %.1f %.1f %.1f".format(
-                                m.pico, m.giro, m.largura, m.forca, m.gravidade[0], m.gravidade[1], m.gravidade[2]))
-                            principal.post { aviso[0](m.forca == Forca.FORTE) }
+                        for (r in batida.tirarRegistros()) Log.i("OrbeBatida", r)
+                        for (jn in batida.tirarJanelas()) {
+                            val forte = modelo.classificar(jn).first == Forca.FORTE
+                            principal.post { aviso[0](forte) }
                         }
-                        for ((p, g) in batida.tirarPosGiros()) Log.i("OrbeBatida", "pós: pico %.1f giro nos 200 ms %.1f".format(p, g))
-                        for (d in batida.tirarDescartes()) Log.i("OrbeBatida", "descartado: $d")
                         for (c in batida.tirarComandos()) {
                             Log.i("OrbeBatida", "comando ${c.forca} x${c.vezes}")
                             principal.post { acao[0](c) }

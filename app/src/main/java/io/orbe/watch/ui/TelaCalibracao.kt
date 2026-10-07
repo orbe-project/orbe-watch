@@ -21,13 +21,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.orbe.watch.gesto.Batida
-import io.orbe.watch.gesto.Forca
+import io.orbe.watch.gesto.Janela
 import io.orbe.watch.gesto.Picos
 import io.orbe.watch.gesto.Sacudida
 import io.orbe.watch.gesto.ServicoSacudida
@@ -36,7 +39,7 @@ import io.orbe.watch.gesto.limiares
 import kotlin.math.sqrt
 
 /** Qual sacudida a tela de calibração mede. */
-enum class Calibracao { ABRIR, SAIR, FRACA, FORTE }
+enum class Calibracao { ABRIR, SAIR, FRACA, FORTE, NADA }
 
 /**
  * Calibração da sacudida de abrir (a do HinaWatch): mede [TENTATIVAS] sacudidas
@@ -106,55 +109,71 @@ fun TelaCalibracaoSair(
 }
 
 /**
- * Calibração das batidas: [TENTATIVAS_BATIDA] da força escolhida (o toque fraco
- * entre os dedos ou na mesa, ou o estalo), com o pulso parado antes de cada uma.
- * Mede o pico do tranco de cada uma; o app propõe os limiares a partir delas.
+ * Calibração das batidas pelo perfil do movimento. No toque fraco e no estalo,
+ * [TENTATIVAS_BATIDA] tentativas: os trancos que chegam juntos (a pressão do
+ * dedo, o gesto, o rebote) são uma tentativa só, com a janela mais forte do
+ * grupo. Em "o que não é batida", [SEGUNDOS_NADA] segundos de movimento comum
+ * (digitar, tocar a tela, mexer o braço): toda janela vira exemplo do que recusar.
  */
 @Composable
 fun TelaCalibracaoBatida(
-    forca: Forca,
+    tipo: Calibracao,
     emUso: String,
-    /** o pico mínimo de uma tentativa (no estalo, acima da fraca mais forte) */
-    minimo: Float,
     redonda: Boolean,
-    salvar: (List<Float>, List<FloatArray>) -> Unit,
+    salvar: (List<Janela>) -> Unit,
     padrao: () -> Unit,
 ) {
-    val picos = remember { mutableStateListOf<Float>() }
-    val gravidades = remember { mutableStateListOf<FloatArray>() }
-    // na calibração tudo que é tranco curto conta, de qualquer força
-    val batida = remember { Batida(fracaMin = 0.35f, forteMin = Float.MAX_VALUE, calibrando = true) }
-    // os trancos que chegam juntos (a pressão do dedo e o estalo, o rebote) são
-    // uma tentativa só: vale o maior pico do grupo, fechado 500 ms depois do último
-    val grupo = remember { floatArrayOf(0f, 0f) }   // maior pico, instante do último tranco
+    val janelas = remember { mutableStateListOf<Janela>() }
+    val batida = remember { Batida(null, coletando = true) }
+    val nada = tipo == Calibracao.NADA
+    // o grupo em andamento (tentativas) e o relógio da gravação (nada)
+    val grupo = remember { arrayOfNulls<Janela>(1) }
+    val tempos = remember { longArrayOf(0L, 0L) }      // último tranco do grupo, começo da gravação
+    var restante by remember { mutableIntStateOf(if (nada) SEGUNDOS_NADA else 0) }
     SensoresBatida(batida) {
-        val agora = android.os.SystemClock.elapsedRealtime().toFloat()
-        for (m in batida.tirarMedidas()) {
-            Log.i("OrbeBatida", "calibração ${forca.name}: pico ${um(m.pico)} giro ${um(m.giro)} largura ${m.largura}")
-            if (m.pico > grupo[0]) grupo[0] = m.pico
-            grupo[1] = agora
+        val agora = android.os.SystemClock.elapsedRealtime()
+        if (nada) {
+            if (tempos[1] == 0L) tempos[1] = agora
+            val r = SEGUNDOS_NADA - ((agora - tempos[1]) / 1000).toInt()
+            if (r != restante) restante = r.coerceAtLeast(0)
+            for (j in batida.tirarJanelas()) if (restante > 0 && janelas.size < NADA_MAX) janelas += j
+            return@SensoresBatida
         }
-        batida.tirarComandos()
-        if (grupo[0] > 0f && agora - grupo[1] > 500f) {
-            val pico = grupo[0]
-            grupo[0] = 0f
-            if (pico >= minimo && picos.size < TENTATIVAS_BATIDA) {
-                Log.i("OrbeBatida", "calibração ${forca.name}: tentativa ${um(pico)}")
-                picos += pico
+        for (j in batida.tirarJanelas()) {
+            Log.i("OrbeBatida", "calibração $tipo: acel %.1f giro %.1f".format(j.aceleracao, j.giro))
+            val g = grupo[0]
+            if (g == null || Batida.forca(j) > Batida.forca(g)) grupo[0] = j
+            tempos[0] = agora
+        }
+        val g = grupo[0]
+        if (g != null && agora - tempos[0] > 500) {
+            grupo[0] = null
+            if (janelas.size < TENTATIVAS_BATIDA) {
+                Log.i("OrbeBatida", "calibração $tipo: tentativa acel %.1f giro %.1f".format(g.aceleracao, g.giro))
+                janelas += g
             }
         }
     }
-    val fraca = forca == Forca.FRACA
-    val pronta = picos.size >= TENTATIVAS_BATIDA
+    val pronta = if (nada) restante == 0 else janelas.size >= TENTATIVAS_BATIDA
+    val titulo = when (tipo) {
+        Calibracao.FRACA -> "Calibrar o toque fraco"
+        Calibracao.FORTE -> "Calibrar o estalo"
+        else -> "O que não é batida"
+    }
+    val aviso = when {
+        nada && !pronta -> "Digite, toque a tela, mexa o braço como sempre. Gravando: $restante s."
+        nada -> "${janelas.size} movimentos guardados para recusar."
+        pronta -> "Pronto: ${janelas.size} tentativas."
+        tipo == Calibracao.FRACA -> "Braço erguido, um toque do dedo médio no dedão. Tentativa ${janelas.size + 1} de $TENTATIVAS_BATIDA."
+        else -> "Braço erguido, um estalo. Tentativa ${janelas.size + 1} de $TENTATIVAS_BATIDA."
+    }
     Moldura(
-        if (fraca) "Calibrar o toque fraco" else "Calibrar o estalo", redonda,
-        aviso = if (pronta) "Picos de ${um(picos.min())} a ${um(picos.max())} m/s²"
-        else (if (fraca) "Pulso parado, um toque do dedo médio no dedão (ou na mesa)." else "Pulso parado, um estalo de dedos.") +
-            " Tentativa ${picos.size + 1} de $TENTATIVAS_BATIDA.",
-        tentativas = picos.map { "pico ${um(it)} m/s²" },
-        padrao = if (fraca) "fraca a partir de ${um(Batida.FRACA_MIN)}" else "forte a partir de ${um(Batida.FORTE_MIN)}",
-        aoPadrao = padrao,
-        pronta = pronta, refazer = { picos.clear(); gravidades.clear() }, salvar = { salvar(picos.toList(), gravidades.toList()) },
+        titulo, redonda,
+        aviso = aviso,
+        tentativas = if (nada) emptyList() else janelas.map { "acel ${um(it.aceleracao)} · giro ${um(it.giro)}" },
+        padrao = "apagar as três calibrações", aoPadrao = padrao,
+        pronta = pronta, refazer = { janelas.clear(); tempos[1] = 0L; restante = if (nada) SEGUNDOS_NADA else 0 },
+        salvar = { salvar(janelas.toList()) },
         emUso = emUso,
     )
 }
@@ -283,7 +302,9 @@ private fun SensoresBatida(batida: Batida, aoLer: () -> Unit) {
 private fun um(v: Float) = "%.1f".format(v).replace('.', ',')
 
 private const val TENTATIVAS = 3
-private const val TENTATIVAS_BATIDA = 5
+private const val TENTATIVAS_BATIDA = 8
+private const val SEGUNDOS_NADA = 15
+private const val NADA_MAX = 24
 private const val ALFA_GRAVIDADE = 0.2f
 
 /** pico mínimo para uma tentativa contar (o dentro no abrir, o fora no sair): abaixo disso é o pulso se ajeitando */

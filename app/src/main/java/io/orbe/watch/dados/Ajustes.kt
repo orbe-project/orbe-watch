@@ -111,11 +111,14 @@ data class Ajustes(
     val sairFora: Float = 0f,
     /** com o app aberto, batidas no pulso: fraca troca de orbe, o estalo abre e fecha o live */
     val batidas: Boolean = false,
-    /** limiares das batidas em m/s² de tranco; 0 = sem calibrar, vale o padrão ([Batida]) */
-    val batidaFraca: Float = 0f,
-    /** a batida fraca mais forte da calibração: o forte fica entre ela e o estalo mais fraco */
-    val batidaFracaTopo: Float = 0f,
-    val batidaForte: Float = 0f,
+    /**
+     * As calibrações das batidas: as janelas (o perfil do movimento) das
+     * tentativas do toque fraco, das do estalo e do que não é batida, em texto
+     * ([io.orbe.watch.gesto.Janela.texto]); vazias = sem calibrar.
+     */
+    val batidaFracas: String = "",
+    val batidaFortes: String = "",
+    val batidaNada: String = "",
     /** a ação de cada combinação: toque fraco, dois fracos, estalo, dois estalos */
     val batidasAcoes: List<AcaoToque> = AcaoToque.PADRAO_BATIDAS,
 ) {
@@ -227,9 +230,9 @@ class Cofre(private val ctx: Context) {
         val sair = booleanPreferencesKey("sair")
         val sairFora = floatPreferencesKey("sair_fora")
         val batidas = booleanPreferencesKey("batidas")
-        val batidaFraca = floatPreferencesKey("batida_fraca")
-        val batidaForte = floatPreferencesKey("batida_forte")
-        val batidaFracaTopo = floatPreferencesKey("batida_fraca_topo")
+        val batidaFracas = stringPreferencesKey("batida_fracas")
+        val batidaFortes = stringPreferencesKey("batida_fortes")
+        val batidaNada = stringPreferencesKey("batida_nada")
         val batidasAcoes = stringPreferencesKey("batidas_acoes")
     }
 
@@ -302,9 +305,9 @@ class Cofre(private val ctx: Context) {
             sair = p[K.sair] ?: d.sair,
             sairFora = p[K.sairFora] ?: d.sairFora,
             batidas = p[K.batidas] ?: d.batidas,
-            batidaFraca = p[K.batidaFraca] ?: d.batidaFraca,
-            batidaForte = p[K.batidaForte] ?: d.batidaForte,
-            batidaFracaTopo = p[K.batidaFracaTopo] ?: d.batidaFracaTopo,
+            batidaFracas = p[K.batidaFracas] ?: d.batidaFracas,
+            batidaFortes = p[K.batidaFortes] ?: d.batidaFortes,
+            batidaNada = p[K.batidaNada] ?: d.batidaNada,
             batidasAcoes = p[K.batidasAcoes]?.split(',')?.mapNotNull { AcaoToque.de(it) }?.takeIf { it.size == 4 } ?: d.batidasAcoes,
         )
     }
@@ -341,9 +344,9 @@ class Cofre(private val ctx: Context) {
             p.remove(K.historico)
             p[K.sacudidaFora] = a.sacudidaFora
             p[K.batidas] = a.batidas
-            p[K.batidaFraca] = a.batidaFraca
-            p[K.batidaForte] = a.batidaForte
-            p[K.batidaFracaTopo] = a.batidaFracaTopo
+            p[K.batidaFracas] = a.batidaFracas
+            p[K.batidaFortes] = a.batidaFortes
+            p[K.batidaNada] = a.batidaNada
             p[K.batidasAcoes] = a.batidasAcoes.joinToString(",") { it.id }
             p[K.sacudidaDentro] = a.sacudidaDentro
             p[K.ordem] = a.ordem.joinToString(",")
