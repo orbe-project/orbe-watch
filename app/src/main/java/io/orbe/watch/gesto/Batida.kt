@@ -9,6 +9,8 @@ import kotlin.math.sqrt
  */
 object TelaTocada {
     @Volatile var surdoAte = 0L
+    /** o último tranco de batida (ms desde o boot): o estalo gira o pulso e a sacudida de sair não pode valer nele */
+    @Volatile var ultimoTrancoMs = 0L
 }
 
 /** A força de uma batida: o toque fraco (dedo médio no dedão, ou a ponta dos dedos na mesa) ou o estalo. */
@@ -67,9 +69,19 @@ class Batida(
         medidas.clear(); comandos.clear()
     }
 
+    // o giro do pulso nos 200 ms depois de cada tranco (o estalo gira o pulso; o toque, pouco): só para o log, por ora
+    private var giroPosAte = 0L
+    private var giroPosMax = 0f
+    private var giroPosPico = 0f
+    private val posGiros = ArrayList<Pair<Float, Float>>()
+
+    /** (pico do tranco, giro máximo nos 200 ms seguintes) de cada tranco curto. */
+    fun tirarPosGiros(): List<Pair<Float, Float>> = posGiros.toList().also { posGiros.clear() }
+
     /** O giroscópio (rad/s): só a intensidade, para o quieto e a medida. */
     fun giro(x: Float, y: Float, z: Float) {
         giroAgora = sqrt(x * x + y * y + z * z)
+        if (giroPosAte > 0L && giroAgora > giroPosMax) giroPosMax = giroAgora
         giroMedio += (giroAgora - giroMedio) * 0.1f
         if (emPico && giroAgora > picoGiro) picoGiro = giroAgora
     }
@@ -77,6 +89,10 @@ class Batida(
     /** Uma leitura do acelerômetro (m/s²) no instante [ms]. */
     fun acel(ms: Long, x: Float, y: Float, z: Float) {
         if (!temLenta) { lx = x; ly = y; lz = z; temLenta = true; return }
+        if (giroPosAte > 0L && ms > giroPosAte) {
+            posGiros += giroPosPico to giroPosMax
+            giroPosAte = 0L
+        }
         lx += (x - lx) * LENTA; ly += (y - ly) * LENTA; lz += (z - lz) * LENTA
         val dx = x - lx; val dy = y - ly; val dz = z - lz
         val tranco = sqrt(dx * dx + dy * dy + dz * dz)
@@ -90,6 +106,7 @@ class Batida(
             val quieto = ruido < QUIETO && giroMedio < GIRO_QUIETO
             if (quieto && ms >= bloqueadoAte && tranco >= fracaMin * GATILHO) {
                 emPico = true; picoMax = tranco; picoGiro = giroAgora; largura = 1; depois = 0
+                TelaTocada.ultimoTrancoMs = ms
             } else {
                 ruido += (tranco - ruido) * 0.08f
             }
@@ -101,6 +118,7 @@ class Batida(
                 emPico = false
                 bloqueadoAte = ms + REFRATARIO_MS
                 val curto = largura <= LARGURA_MAX && depois < VOLTA_AMOSTRAS
+                if (curto && giroPosAte == 0L) { giroPosAte = ms + 200; giroPosMax = picoGiro; giroPosPico = picoMax }
                 if (curto && picoMax >= fracaMin && naPostura()) {
                     val f = if (picoMax >= forteMin) Forca.FORTE else Forca.FRACA
                     val anterior = ultimoTrancoMs
@@ -138,6 +156,8 @@ class Batida(
             ultimaMs = ms
             return
         }
+        // e o rebote fraco logo depois do estalo também é dele
+        if (f == Forca.FRACA && pendente == Forca.FORTE && ms - ultimaMs <= PRE_ESTALO_MS) return
         if (pendente != null && pendente != f) soltar()
         pendente = f
         vezes++

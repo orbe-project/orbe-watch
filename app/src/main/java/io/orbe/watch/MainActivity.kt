@@ -88,16 +88,32 @@ class MainActivity : ComponentActivity() {
                     val gesto = sacudida.ler(event.timestamp / 1_000_000, x, sqrt(x * x + y * y + z * z))
                     sacudida.tirarResumo()?.let { Log.d(TAG, "na tela: $it") }
                     if (gesto == Gesto.SAIR) {
-                        Log.i(TAG, "sair: sacudida para fora")
-                        ServicoSacudida.saiuEm = SystemClock.uptimeMillis()
-                        // o relógio volta ao mostrador; o onStop fecha a ponte e corta a voz
-                        moveTaskToBack(true)
+                        if (!vm.ajustes.value.batidas) sairPelaSacudida()
+                        else {
+                            // o estalo gira o pulso como a sacudida de sair: espera um
+                            // instante e só sai se não houve tranco de batida em volta
+                            val em = SystemClock.elapsedRealtime()
+                            janela.postDelayed({
+                                val t = io.orbe.watch.gesto.TelaTocada.ultimoTrancoMs
+                                if (kotlin.math.abs(t - em) < 500) Log.i(TAG, "sair ignorado: era batida")
+                                else sairPelaSacudida()
+                            }, 200)
+                        }
                     }
                 }
             }
         }
 
         override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+    }
+
+    private val janela = android.os.Handler(android.os.Looper.getMainLooper())
+
+    private fun sairPelaSacudida() {
+        Log.i(TAG, "sair: sacudida para fora")
+        ServicoSacudida.saiuEm = SystemClock.uptimeMillis()
+        // o relógio volta ao mostrador; o onStop fecha a ponte e corta a voz
+        moveTaskToBack(true)
     }
 
     private fun ligarSair(ligar: Boolean) {
