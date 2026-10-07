@@ -48,6 +48,7 @@ class Batida(
     private var pendente: Forca? = null
     private var vezes = 0
     private var ultimaMs = 0L
+    private var ultimoTrancoMs = -1_000_000L   // o último tranco curto de qualquer força (digitar dá rajada)
     private val medidas = ArrayList<Medida>()
     private val comandos = ArrayList<Comando>()
 
@@ -87,8 +88,15 @@ class Batida(
                 val curto = largura <= LARGURA_MAX && depois < VOLTA_AMOSTRAS
                 if (curto && picoMax >= fracaMin) {
                     val f = if (picoMax >= forteMin) Forca.FORTE else Forca.FRACA
-                    medidas += Medida(picoMax, picoGiro, largura, f)
-                    contar(ms, f)
+                    val anterior = ultimoTrancoMs
+                    ultimoTrancoMs = ms
+                    if (pendente == null && ms - anterior < ISOLADO_MS) {
+                        // tranco logo depois de outro sem comando em curso: é rajada (digitar)
+                        bloqueadoAte = ms + SURDO_MS
+                    } else {
+                        medidas += Medida(picoMax, picoGiro, largura, f)
+                        contar(ms, f)
+                    }
                 }
                 ruido = 0f
             }
@@ -102,7 +110,12 @@ class Batida(
         pendente = f
         vezes++
         ultimaMs = ms
-        if (vezes >= 2) soltar()
+        // um terceiro na janela: era rajada, nada sai
+        if (vezes > 2) {
+            pendente = null
+            vezes = 0
+            bloqueadoAte = ms + SURDO_MS
+        }
     }
 
     private fun soltar() {
@@ -128,6 +141,8 @@ class Batida(
         private const val LARGURA_MAX = 4        // amostras acima da metade do pico (~40 ms)
         private const val VOLTA_AMOSTRAS = 12    // ~120 ms para voltar ao quieto
         private const val REFRATARIO_MS = 120L   // o rebote do tranco não conta como outra
+        private const val ISOLADO_MS = 500L      // sem outro tranco antes disso: o primeiro de um comando
+        private const val SURDO_MS = 600L        // depois de uma rajada, um tempo sem contar
         const val JUNTAR_MS = 750L               // até aqui, a segunda da mesma força soma (os pares do Davi: 650 a 1090 ms)
     }
 }
