@@ -5,6 +5,7 @@ import io.orbe.watch.orbe.Estado.LISTENING
 import io.orbe.watch.orbe.Estado.SPEAKING
 import io.orbe.watch.orbe.Estado.THINKING
 import io.orbe.watch.orbe.Estado.TOOLS
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -145,7 +146,7 @@ class Figura(skinInicial: Skin) : Arte {
         }
         s.ondas.removeAll { s.t - it[0] >= 1.3 }
         when (skin) {
-            Skin.SERAFIM_GRAVURA -> evoluirGravura(dt)
+            Skin.SERAFIM_GRAVURA, Skin.SERAFIM_POSITIVO -> evoluirGravura(dt)
             Skin.OLHO, Skin.HUMANA -> evoluirPartes(dt)
             else -> {
                 evoluirOfanim(dt)
@@ -193,9 +194,12 @@ class Figura(skinInicial: Skin) : Arte {
         // a pose desenhada é a de ouvir; parado, as asas se recolhem
         val ab = mistura(0.55, 1.0, 0.85, 0.9, 0.95)
         s.abreAsa += (ab - s.abreAsa) * min(1.0, dt * 3)
-        val amp = mistura(0.06, 0.0, 0.35, 0.22, 0.12) + 0.3 * falar
+        // o ciclo das articulações (as do meio abrem enquanto as de cima fecham
+        // e as de baixo abrem; depois o contrário): amplitude e ritmo por estado,
+        // como no Figura.qml
+        val amp = mistura(0.45, 0.7, 1.0, 0.8, 0.75) + 0.25 * falar
         s.ampAsa += (amp - s.ampAsa) * min(1.0, dt * 3)
-        s.faseAsa += dt * TAU * (mistura(0.2, 0.1, 0.9, 1.6, 0.6) + 0.8 * falar)
+        s.faseAsa += dt * TAU * (mistura(0.10, 0.18, 0.35, 0.6, 0.28) + 0.25 * falar)
     }
 
     /**
@@ -447,7 +451,7 @@ class Figura(skinInicial: Skin) : Arte {
                     }
                 }
             }
-            Skin.SERAFIM_GRAVURA -> {
+            Skin.SERAFIM_GRAVURA, Skin.SERAFIM_POSITIVO -> {
                 val dG = suave(desperto)
                 r = rb * (0.3 + 0.7 * dG)
                 gx = if (temOlhar) olharX else cx + ruido(t * 0.6, 3.0) * r * 1.4
@@ -459,7 +463,15 @@ class Figura(skinInicial: Skin) : Arte {
                     gx = gx * (1 - pensar) + vx * pensar
                     gy = gy * (1 - pensar) + vy * pensar
                 }
-                fx.v4("img", s.abreAsa * dG, s.ampAsa * sin(s.faseAsa), 0.025 * falar, 0.0)
+                // f: 0 com as do meio recolhidas, 1 abertas; as de cima fecham quando
+                // elas abrem, as de baixo fecham quando elas recolhem. dobra: o
+                // recolher do estado e do despertar, nas bases (ver imagem.frag)
+                val fA = 0.5 * (1 - cos(s.faseAsa))
+                val aA = s.ampAsa * dG
+                val dobra = 1 - s.abreAsa * dG
+                val grau = PI / 180
+                fx.v4("img", 5 * grau * (2 * fA - 1) * aA - 0.25 * dobra, 24 * grau * fA * aA, 0.025 * falar, -7 * grau * fA * aA + 0.35 * dobra)
+                fx.v4("img2", -16 * grau * fA * aA, -16 * grau * (1 - fA) * aA, -7 * grau * (1 - fA) * aA + 0.35 * dobra, 0.0)
             }
             else -> {
                 val d = desperto
