@@ -64,6 +64,10 @@ class Batida(
     private var ultimoTrancoMs = -1_000_000L   // o último tranco curto de qualquer força (digitar dá rajada)
     private val medidas = ArrayList<Medida>()
     private val comandos = ArrayList<Comando>()
+    private val descartes = ArrayList<String>()
+
+    /** Por que cada tranco curto não contou, desde a última vez (para o log). */
+    fun tirarDescartes(): List<String> = descartes.toList().also { descartes.clear() }
 
     fun zerar() {
         temLenta = false; ruido = 0f; giroMedio = 0f
@@ -121,6 +125,7 @@ class Batida(
                 bloqueadoAte = ms + REFRATARIO_MS
                 val curto = largura <= LARGURA_MAX && depois < VOLTA_AMOSTRAS
                 if (curto && giroPosAte == 0L) { giroPosAte = ms + 200; giroPosMax = picoGiro; giroPosPico = picoMax }
+                if (curto && picoMax >= fracaMin && !naPostura()) descartes += "pico %.1f: braço abaixo de 15°".format(picoMax)
                 if (curto && picoMax >= fracaMin && naPostura()) {
                     val f = if (picoMax >= forteMin) Forca.FORTE else Forca.FRACA
                     val anterior = ultimoTrancoMs
@@ -128,6 +133,7 @@ class Batida(
                     if (pendente == null && ms - anterior < ISOLADO_MS) {
                         // tranco logo depois de outro sem comando em curso: é rajada (digitar)
                         bloqueadoAte = ms + SURDO_MS
+                        descartes += "pico %.1f: rajada (outro tranco %d ms antes)".format(picoMax, ms - anterior)
                     } else {
                         medidas += Medida(picoMax, picoGiro, largura, f, floatArrayOf(lx, ly, lz))
                         contar(ms, f)
@@ -167,6 +173,7 @@ class Batida(
         ultimaMs = ms
         // um terceiro na janela: era rajada, nada sai
         if (vezes > 2) {
+            descartes += "terceiro toque na janela: comando cancelado"
             pendente = null
             vezes = 0
             bloqueadoAte = ms + SURDO_MS

@@ -299,6 +299,7 @@ private fun BatidasNoPulso(
                             principal.post { aviso[0](m.forca == Forca.FORTE) }
                         }
                         for ((p, g) in batida.tirarPosGiros()) Log.i("OrbeBatida", "pós: pico %.1f giro nos 200 ms %.1f".format(p, g))
+                        for (d in batida.tirarDescartes()) Log.i("OrbeBatida", "descartado: $d")
                         for (c in batida.tirarComandos()) {
                             Log.i("OrbeBatida", "comando ${c.forca} x${c.vezes}")
                             principal.post { acao[0](c) }
