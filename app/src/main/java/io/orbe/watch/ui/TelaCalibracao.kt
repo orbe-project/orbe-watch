@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import io.orbe.watch.gesto.Batida
 import io.orbe.watch.gesto.Janela
 import io.orbe.watch.gesto.ModeloBatida
-import io.orbe.watch.gesto.Perfil
 import io.orbe.watch.gesto.Picos
 import io.orbe.watch.gesto.Sacudida
 import io.orbe.watch.gesto.ServicoSacudida
@@ -178,13 +177,8 @@ fun TelaCalibracaoBatida(
     Moldura(
         titulo, redonda,
         aviso = aviso,
-        tentativas = if (nada) emptyList() else {
-            // a semelhança de cada tentativa com a forma média (a do perfil que sai delas)
-            val perfil = Perfil.de(janelas.toList())
-            janelas.map { j ->
-                "acel ${um(j.aceleracao)} · giro ${um(j.giro)}" + (perfil?.let { " · forma %.2f".format(it.parecenca(j)).replace('.', ',') } ?: "")
-            }
-        },
+        // as tentativas estão no gráfico: a lista de números não diz mais nada
+        tentativas = emptyList(),
         grafico = { GraficoPerfil(janelas.toList()) },
         padrao = "apagar as três calibrações", aoPadrao = padrao,
         pronta = pronta, refazer = { janelas.clear(); tempos[1] = 0L; restante = if (nada) SEGUNDOS_NADA else 0 },
