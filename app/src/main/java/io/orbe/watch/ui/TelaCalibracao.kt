@@ -121,7 +121,7 @@ fun TelaCalibracaoBatida(
     val picos = remember { mutableStateListOf<Float>() }
     val gravidades = remember { mutableStateListOf<FloatArray>() }
     // na calibração tudo que é tranco curto conta, de qualquer força
-    val batida = remember { Batida(fracaMin = 0.8f, forteMin = Float.MAX_VALUE) }
+    val batida = remember { Batida(fracaMin = 0.35f, forteMin = Float.MAX_VALUE, calibrando = true) }
     SensoresBatida(batida) {
         for (m in batida.tirarMedidas()) {
             Log.i("OrbeBatida", "calibração ${forca.name}: pico ${um(m.pico)} giro ${um(m.giro)} largura ${m.largura}")

@@ -38,6 +38,8 @@ class Batida(
     var fracaMin: Float = FRACA_MIN,
     /** a partir deste pico, forte (entre a fraca mais forte e o estalo mais fraco da calibração) */
     var forteMin: Float = FORTE_MIN,
+    /** na calibração: qualquer postura (a regra do braço erguido é do uso) */
+    private val calibrando: Boolean = false,
 ) {
     // a parte lenta da aceleração (filtro de primeira ordem): o que sobra é o tranco
     private var lx = 0f
@@ -144,6 +146,7 @@ class Batida(
      * cresce com a mão subindo (medido no relógio do Davi: 1 a 4 m/s² nos toques).
      */
     private fun naPostura(): Boolean {
+        if (calibrando) return true
         val g = sqrt(lx * lx + ly * ly + lz * lz)
         return g > 1f && lx / g >= SEN_ELEVACAO
     }
@@ -215,4 +218,4 @@ fun limiaresBatida(fracas: List<Float>, fortes: List<Float>): Pair<Float, Float>
 /** a batida precisa de 85% da tentativa mais leve da calibração (com 60%, como a sacudida, pegava o pulso parado) */
 const val MARGEM_BATIDA = 0.85f
 /** nenhum limiar abaixo disto (m/s²): é o tremor do pulso parado */
-const val PISO_FRACA = 0.7f
+const val PISO_FRACA = 0.5f
