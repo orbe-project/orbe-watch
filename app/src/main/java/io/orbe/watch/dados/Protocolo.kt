@@ -89,6 +89,8 @@ data class SessaoPassada(
     val titulo: String = "",
     /** a pasta em que ela rodou */
     val pasta: String = "",
+    /** o caminho dessa pasta: o projeto, no agrupamento do histórico */
+    val cwd: String = "",
     /** a última atividade, em segundos desde 1970; 0 = não se sabe */
     val quando: Long = 0,
 )

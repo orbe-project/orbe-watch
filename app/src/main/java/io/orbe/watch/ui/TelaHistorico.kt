@@ -25,8 +25,11 @@ import java.util.Locale
 
 /**
  * O histórico de sessões do agente do orbe em tela, aberto pelos toques (no
- * padrão, tocar e segurar; aba Ativação): escolher uma retoma a conversa no PC e o orbe
- * passa a falar com ela. O voltar do sistema fecha sem escolher.
+ * padrão, tocar e segurar; aba Gestos): escolher uma retoma a conversa no PC e o orbe
+ * passa a falar com ela. No alto as mais recentes, embaixo os projetos (as
+ * pastas onde há conversas); tocar num projeto mostra só as dele, e o voltar
+ * (ou o arraste para a direita) volta aos projetos. Nos projetos, o voltar
+ * fecha sem escolher.
  */
 @Composable
 fun TelaHistorico(
@@ -34,6 +37,9 @@ fun TelaHistorico(
     agente: String,
     lista: TransformingLazyColumnState,
     redonda: Boolean,
+    /** o projeto aberto (o cwd); null, os recentes e a lista dos projetos */
+    projeto: String?,
+    abrirProjeto: (String) -> Unit,
     retomar: (String) -> Unit,
     modifier: Modifier = Modifier,
     fechar: () -> Unit = {},
@@ -74,19 +80,59 @@ fun TelaHistorico(
                 historico.carregando -> linha { Linha("Buscando as sessões…") }
                 historico.erro.isNotEmpty() -> linha { Linha(historico.erro) }
                 historico.sessoes.isEmpty() -> linha { Linha("Nenhuma sessão") }
-                else -> historico.sessoes.forEach { s ->
-                    linha {
-                        Linha(
-                            s.titulo.ifEmpty { s.id.take(8) },
-                            subtitulo = listOf(pasta(s.pasta), quando(s.quando)).filter { it.isNotEmpty() }.joinToString(" · "),
-                            aoClicar = { retomar(s.id) },
-                        )
+                projeto != null -> {
+                    val deste = historico.sessoes.filter { chave(it) == projeto }
+                    grupo(nomeProjeto(projeto), caminho(projeto))
+                    deste.forEach { s ->
+                        linha { Linha(s.titulo.ifEmpty { s.id.take(8) }, subtitulo = quando(s.quando), aoClicar = { retomar(s.id) }) }
+                    }
+                }
+                else -> {
+                    grupo("Recentes")
+                    historico.sessoes.take(RECENTES).forEach { s ->
+                        linha {
+                            Linha(
+                                s.titulo.ifEmpty { s.id.take(8) },
+                                subtitulo = listOf(pasta(s.pasta), quando(s.quando)).filter { it.isNotEmpty() }.joinToString(" · "),
+                                aoClicar = { retomar(s.id) },
+                            )
+                        }
+                    }
+                    // os projetos pela atividade mais recente (a lista já vem da mais nova)
+                    val projetos = historico.sessoes.groupBy(::chave)
+                    grupo("Projetos", "${projetos.size} com conversas")
+                    projetos.forEach { (cwd, l) ->
+                        linha {
+                            Linha(
+                                nomeProjeto(cwd),
+                                subtitulo = listOf(
+                                    if (l.size == 1) "1 conversa" else "${l.size} conversas",
+                                    quando(l.first().quando),
+                                ).filter { it.isNotEmpty() }.joinToString(" · "),
+                                aoClicar = { abrirProjeto(cwd) },
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
+
+/** As mais recentes no alto do histórico, antes dos projetos. */
+private const val RECENTES = 4
+
+/** O projeto de uma sessão: o caminho da pasta (ou só o nome, de ponte que não manda o caminho). */
+private fun chave(s: io.orbe.watch.dados.SessaoPassada) = s.cwd.ifEmpty { s.pasta }
+
+/** O nome do projeto: a última pasta do caminho; a pasta pessoal é "~". */
+private fun nomeProjeto(cwd: String): String {
+    val c = caminho(cwd)
+    return if (c == "~") "~" else c.trimEnd('/').substringAfterLast('/').ifEmpty { c }
+}
+
+/** O caminho com a pasta pessoal abreviada (Linux e macOS). */
+private fun caminho(cwd: String): String = cwd.replace(Regex("^/(home|Users)/[^/]+"), "~")
 
 /** A pasta como no rótulo da sessão: com a barra na frente. */
 private fun pasta(p: String): String = if (p.isEmpty() || p.startsWith("/")) p else "/$p"

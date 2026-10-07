@@ -35,6 +35,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -82,6 +83,8 @@ fun OrbeApp(
     val historico by vm.historico.collectAsStateWithLifecycle()
     val agentesPc by vm.agentesPc.collectAsStateWithLifecycle()
     val listaHistorico = rememberTransformingLazyColumnState()
+    // o projeto aberto no histórico (o cwd); null, a lista dos projetos
+    var projetoHistorico by remember { mutableStateOf<String?>(null) }
     val redonda = LocalConfiguration.current.isScreenRound
     val paginas = rememberPagerState { 2 }
     val lista = rememberTransformingLazyColumnState()
@@ -251,15 +254,20 @@ fun OrbeApp(
         }
         historico?.let { h ->
             // arrastar para a direita fecha só o histórico e volta ao orbe: sem a
-            // caixa, o arraste ia ao sistema, que fechava o app inteiro
+            // caixa, o arraste ia ao sistema, que fechava o app inteiro. Dentro
+            // de um projeto, o arraste volta à lista dos projetos (a caixa nasce
+            // de novo a cada nível, com o estado dela zerado)
             CompositionLocalProvider(
                 LocalSwipeToDismissBackgroundScrimColor provides Color.Transparent,
                 LocalSwipeToDismissContentScrimColor provides Color.Transparent,
             ) {
-                BasicSwipeToDismissBox(onDismissed = vm::fecharHistorico) { fundo ->
-                    if (!fundo) {
-                        TelaHistorico(h, nomeAgente(ajustes, aparencia.skin, agentesPc), listaHistorico, redonda,
-                            retomar = vm::retomar, fechar = vm::fecharHistorico)
+                key(projetoHistorico) {
+                    BasicSwipeToDismissBox(onDismissed = { if (projetoHistorico != null) projetoHistorico = null else vm.fecharHistorico() }) { fundo ->
+                        if (!fundo) {
+                            TelaHistorico(h, nomeAgente(ajustes, aparencia.skin, agentesPc), listaHistorico, redonda,
+                                projeto = projetoHistorico, abrirProjeto = { projetoHistorico = it },
+                                retomar = vm::retomar, fechar = vm::fecharHistorico)
+                        }
                     }
                 }
             }
@@ -270,9 +278,13 @@ fun OrbeApp(
     BackHandler(calibrando == null && paginas.currentPage == 1) {
         if (aba != null) aba = null else escopo.launch { paginas.animateScrollToPage(0) }
     }
-    BackHandler(historico != null) { vm.fecharHistorico() }
-    // cada abertura do histórico começa do alto
-    LaunchedEffect(historico == null) { if (historico != null) listaHistorico.scrollToItem(0) }
+    BackHandler(historico != null) { if (projetoHistorico != null) projetoHistorico = null else vm.fecharHistorico() }
+    // cada abertura do histórico (e cada nível dele) começa do alto, na lista dos projetos
+    LaunchedEffect(historico == null) {
+        projetoHistorico = null
+        if (historico != null) listaHistorico.scrollToItem(0)
+    }
+    LaunchedEffect(projetoHistorico) { if (historico != null) listaHistorico.scrollToItem(0) }
     LaunchedEffect(Unit) { foco.requestFocus() }
     LaunchedEffect(menuPedido.value) {
         val m = menuPedido.value ?: return@LaunchedEffect
