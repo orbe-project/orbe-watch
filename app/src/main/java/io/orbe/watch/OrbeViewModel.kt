@@ -186,11 +186,12 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
     // o olá do PC (com a imagem do fundo em base64, ~40 KB) e o tema dele, lidos
     // uma vez por texto: a aparência é refeita a cada linha do agente, e o parse
     // de novo a cada vez enchia a memória de objetos grandes
-    private var olaLido: Triple<String, io.orbe.watch.dados.Ola?, Tema> = Triple("", null, Tema.Padrao)
+    // anulável de propósito: o init (o combine) chega aqui antes deste campo ser inicializado
+    private var olaLido: Triple<String, io.orbe.watch.dados.Ola?, Tema>? = null
 
     private fun olaDe(texto: String): Pair<io.orbe.watch.dados.Ola?, Tema> {
         val l = olaLido
-        if (l.first === texto || l.first == texto) return l.second to l.third
+        if (l != null && (l.first === texto || l.first == texto)) return l.second to l.third
         val pc = texto.takeIf { it.isNotEmpty() }?.let(Protocolo::ola)
         val tema = pc?.let { Tema.de(it.tema, it.papel, Tema.imagemDoFundo(it.papelId, it.papelImagem)) } ?: Tema.Padrao
         olaLido = Triple(texto, pc, tema)
