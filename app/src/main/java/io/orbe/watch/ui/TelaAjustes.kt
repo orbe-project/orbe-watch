@@ -327,6 +327,9 @@ private fun MenuEscopo.aparencia(vm: OrbeViewModel, ajustes: Ajustes, glitch: Bo
         LinhaSwitch("Fundo atrás do orbe", ajustes.fundo) { vm.fundo(it) }
     }
     linha {
+        LinhaSwitch("Fundo no menu", ajustes.fundoMenu) { vm.fundoMenu(it) }
+    }
+    linha {
         LinhaSwitch("Texto do raciocínio", ajustes.texto) { vm.texto(it) }
     }
     linha {
@@ -402,6 +405,14 @@ private fun MenuEscopo.gestos(vm: OrbeViewModel, ajustes: Ajustes, pedirMicrofon
     grupo("Batidas", "Com o app aberto: toque fraco (dedo médio no dedão, ou na mesa) e estalo. Um toque troca a ação.")
     linha {
         LinhaSwitch("Batidas e estalos", ajustes.batidas) { vm.batidas(it) }
+    }
+    linha {
+        Linha(
+            "Intervalo entre toques",
+            subtitulo = "%.1f s · também a espera até o comando".format(ajustes.batidasIntervalo / 1000.0).replace('.', ','),
+            ativo = ajustes.batidas,
+            aoClicar = { vm.proximoIntervalo() },
+        )
     }
     duas((0 until 4).map { i ->
         @Composable { Linha(nomeBatida(i), subtitulo = ajustes.batidasAcoes[i].nome, ativo = ajustes.batidas, aoClicar = { vm.proximaBatida(i) }) }

@@ -67,6 +67,8 @@ data class Ajustes(
     val linhas: Boolean = true,
     /** o fundo do menu (o papel de parede do PC borrado) também atrás dos orbes */
     val fundo: Boolean = true,
+    /** o papel de parede borrado nos menus; desligado, os menus ficam no preto */
+    val fundoMenu: Boolean = true,
     /** escala do orbe na tela: 1,0 enche o mostrador. É a de cada orbe que ainda não tem a sua ([tamanhos]) */
     val tamanho: Float = 1f,
     /** a escala de cada orbe, pela skin: cada um guarda a sua */
@@ -121,6 +123,8 @@ data class Ajustes(
     val batidaNada: String = "",
     /** a ação de cada combinação: toque fraco, dois fracos, estalo, dois estalos */
     val batidasAcoes: List<AcaoToque> = AcaoToque.PADRAO_BATIDAS,
+    /** o intervalo máximo entre os toques de uma sequência (ms): também a espera até o comando sair */
+    val batidasIntervalo: Long = io.orbe.watch.gesto.Batida.JUNTAR_MS,
 ) {
     /** A ação de [n] toques curtos (1 a 4). */
     fun toque(n: Int): AcaoToque = toques.getOrNull(n - 1) ?: AcaoToque.NADA
@@ -203,6 +207,7 @@ class Cofre(private val ctx: Context) {
         val instancia = intPreferencesKey("instancia")
         val instancias = stringPreferencesKey("instancias")  // "skin=1;skin=0"
         val fundo = booleanPreferencesKey("fundo")
+        val fundoMenu = booleanPreferencesKey("fundo_menu")
         val glitch = booleanPreferencesKey("glitch")
         val linhas = booleanPreferencesKey("linhas")
         val tamanho = floatPreferencesKey("tamanho")
@@ -234,6 +239,7 @@ class Cofre(private val ctx: Context) {
         val batidaFortes = stringPreferencesKey("batida_fortes")
         val batidaNada = stringPreferencesKey("batida_nada")
         val batidasAcoes = stringPreferencesKey("batidas_acoes")
+        val batidasIntervalo = longPreferencesKey("batidas_intervalo")
     }
 
     private fun lerAgentes(s: String?): Map<String, String> =
@@ -276,6 +282,7 @@ class Cofre(private val ctx: Context) {
             instancia = p[K.instancia] ?: d.instancia,
             instancias = lerInstancias(p[K.instancias]),
             fundo = p[K.fundo] ?: d.fundo,
+            fundoMenu = p[K.fundoMenu] ?: d.fundoMenu,
             glitch = p[K.glitch] ?: d.glitch,
             linhas = p[K.linhas] ?: d.linhas,
             tamanho = (p[K.tamanho] ?: d.tamanho).coerceIn(Ajustes.TAMANHO_MIN, Ajustes.TAMANHO_MAX),
@@ -309,6 +316,7 @@ class Cofre(private val ctx: Context) {
             batidaFortes = p[K.batidaFortes] ?: d.batidaFortes,
             batidaNada = p[K.batidaNada] ?: d.batidaNada,
             batidasAcoes = p[K.batidasAcoes]?.split(',')?.mapNotNull { AcaoToque.de(it) }?.takeIf { it.size == 8 } ?: d.batidasAcoes,
+            batidasIntervalo = p[K.batidasIntervalo] ?: d.batidasIntervalo,
         )
     }
 
@@ -321,6 +329,7 @@ class Cofre(private val ctx: Context) {
             p[K.instancia] = a.instancia
             p[K.instancias] = a.instancias.entries.joinToString(";") { "${it.key}=${it.value}" }
             p[K.fundo] = a.fundo
+            p[K.fundoMenu] = a.fundoMenu
             p[K.glitch] = a.glitch
             p[K.linhas] = a.linhas
             p[K.tamanho] = a.tamanho
@@ -348,6 +357,7 @@ class Cofre(private val ctx: Context) {
             p[K.batidaFortes] = a.batidaFortes
             p[K.batidaNada] = a.batidaNada
             p[K.batidasAcoes] = a.batidasAcoes.joinToString(",") { it.id }
+            p[K.batidasIntervalo] = a.batidasIntervalo
             p[K.sacudidaDentro] = a.sacudidaDentro
             p[K.ordem] = a.ordem.joinToString(",")
             p[K.sair] = a.sair

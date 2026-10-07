@@ -107,6 +107,9 @@ fun Texto(
 /** Verdadeiro enquanto a tela rola: as miniaturas esperam paradas (a GPU do relógio é pouca para as duas coisas). */
 val LocalRolando = compositionLocalOf { false }
 
+/** O papel de parede borrado atrás dos menus; desligado, eles ficam no preto. */
+val LocalFundoMenu = compositionLocalOf { true }
+
 /** Botão de texto: chapado, ou em pílula na cor de destaque. `ligado` tinge o chapado, para os que alternam. */
 @Composable
 fun Botao(
@@ -281,8 +284,12 @@ fun Menu(lista: TransformingLazyColumnState, margem: Dp, conteudo: MenuEscopo.()
 private const val VIDRO = 0.62f
 
 @Composable
-fun FundoVidro(modifier: Modifier = Modifier) {
+fun FundoVidro(modifier: Modifier = Modifier, menu: Boolean = true) {
     val tema = LocalTema.current
+    if (menu && !LocalFundoMenu.current) {
+        Box(modifier.fillMaxSize().background(Color.Black))
+        return
+    }
     val borrao = remember(tema.papel) { tema.papel.takeIf { it.isNotEmpty() }?.let(::borrar) }
     Canvas(modifier.fillMaxSize()) {
         val imagem = tema.imagem

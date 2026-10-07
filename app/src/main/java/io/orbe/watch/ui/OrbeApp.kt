@@ -103,6 +103,7 @@ fun OrbeApp(
     BatidasNoPulso(
         ligado = ajustes.batidas && calibrando == null && modelo.calibrado,
         modelo = modelo,
+        intervalo = ajustes.batidasIntervalo,
         aoDetectar = vm::avisarBatida,
     ) { c ->
         vm.batida(c.indice, podeGravar())
@@ -128,13 +129,17 @@ fun OrbeApp(
     CompositionLocalProvider(
         LocalTema provides aparencia.tema,
         LocalRolando provides (paginas.isScrollInProgress || lista.isScrollInProgress),
+        LocalFundoMenu provides ajustes.fundoMenu,
     ) {
       Box(Modifier.fillMaxSize().background(Color.Black)) {
         // sem o fundo atrás do orbe, ele acende junto com a entrada do menu
         FundoVidro(
             Modifier.graphicsLayer {
-                alpha = if (aparencia.fundo) 1f else (paginas.currentPage + paginas.currentPageOffsetFraction).coerceIn(0f, 1f)
+                val menu = (paginas.currentPage + paginas.currentPageOffsetFraction).coerceIn(0f, 1f)
+                // o papel no orbe (fundo) e no menu (fundoMenu), cada um com a sua chave
+                alpha = (if (aparencia.fundo) 1f - menu else 0f) + (if (ajustes.fundoMenu) menu else 0f)
             },
+            menu = false,
         )
         // com o fundo atrás do orbe, um véu o escurece na página dele e some na entrada do menu
         if (aparencia.fundo) {
@@ -290,7 +295,7 @@ private const val GIRO_POR_PASSO = 90f
  */
 @Composable
 private fun BatidasNoPulso(
-    ligado: Boolean, modelo: ModeloBatida,
+    ligado: Boolean, modelo: ModeloBatida, intervalo: Long,
     aoDetectar: (forte: Boolean) -> Unit, aoComando: (Comando) -> Unit,
 ) {
     val ctx = LocalContext.current
@@ -299,9 +304,9 @@ private fun BatidasNoPulso(
     val aviso = remember { arrayOf(aoDetectar) }
     aviso[0] = aoDetectar
     val dono = LocalLifecycleOwner.current
-    DisposableEffect(ligado, modelo, dono) {
+    DisposableEffect(ligado, modelo, intervalo, dono) {
         if (!ligado) return@DisposableEffect onDispose { }
-        val batida = Batida(modelo)
+        val batida = Batida(modelo, juntarMs = intervalo)
         val principal = Handler(Looper.getMainLooper())
         // os sensores numa linha própria: na principal, cada engasgo do Compose
         // segurava as leituras na fila e atrasava o reconhecimento

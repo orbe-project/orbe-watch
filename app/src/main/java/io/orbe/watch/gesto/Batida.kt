@@ -202,7 +202,7 @@ class ModeloBatida(val fraca: Perfil?, val forte: Perfil?, val nada: List<Janela
  * é o toque fraco, o estalo ou nada. Em [coletando] (a calibração), toda janela
  * sai, sem comando e em qualquer postura.
  *
- * Os comandos: toques fracos a menos de [JUNTAR_MS] um do outro somam (até
+ * Os comandos: toques fracos a menos de [juntarMs] um do outro somam (até
  * [MAX_VEZES]); o estalo fecha a sequência na hora; a pressão do dedo antes do
  * estalo e o rebote depois dele são do estalo; um toque além do máximo cancela
  * (digitar); com o dedo na tela ou a vibração, nada conta. Vale
@@ -212,6 +212,8 @@ class Batida(
     var modelo: ModeloBatida?,
     private val coletando: Boolean = false,
     private val gatilhoColeta: Float = 0.45f,
+    /** o intervalo máximo entre dois toques da mesma sequência: também a espera até o comando sair */
+    private val juntarMs: Long = JUNTAR_MS,
 ) {
     // a parte lenta (filtro de primeira ordem) da aceleração e do giro
     private val lenta = FloatArray(6)
@@ -274,7 +276,7 @@ class Batida(
             // a média não bebe o tremor do motor: senão a segunda batida, logo depois, é recusada
             if (picoEm >= 0 || e >= gatilho) registros += "pulso %.2f perdido na vibração".format(e)
             picoEm = -1
-            if (pendente != null && ms - ultimaMs > JUNTAR_MS) soltar()
+            if (pendente != null && ms - ultimaMs > juntarMs) soltar()
             return
         }
         if (picoEm < 0) {
@@ -300,7 +302,7 @@ class Batida(
         }
         // com um candidato aberto (pico já visto, janela ainda enchendo) o comando
         // espera: o candidato pode ser o toque seguinte da mesma sequência
-        if (pendente != null && picoEm < 0 && ms - ultimaMs > JUNTAR_MS) soltar()
+        if (pendente != null && picoEm < 0 && ms - ultimaMs > juntarMs) soltar()
     }
 
     private fun fecharJanela() {
@@ -332,7 +334,7 @@ class Batida(
         val j = Janela(forma, aMax, gMax)
         if (coletando) { janelas += j; return }
         val m = modelo ?: return
-        val (f, motivo) = m.classificar(j, emSequencia = pendente != null && picoMs - ultimaMs <= JUNTAR_MS)
+        val (f, motivo) = m.classificar(j, emSequencia = pendente != null && picoMs - ultimaMs <= juntarMs)
         registros += "acel %.1f giro %.1f: %s".format(aMax, gMax, motivo)
         if (f != null) { janelas += j; TelaTocada.ultimoTrancoMs = picoMs; contar(picoMs, f) }
     }
@@ -379,6 +381,8 @@ class Batida(
         private const val RAIZ2 = 1.41421f
         const val MAX_VEZES = 4
         const val JUNTAR_MS = 500L               // os toques rápidos do Davi: 300 a 450 ms (pico a pico)
+        /** as escolhas do intervalo nos ajustes */
+        val INTERVALOS = listOf(300L, 400L, 500L, 600L, 800L, 1000L)
 
         /** um número só para comparar a força de duas janelas */
         fun forca(j: Janela) = j.aceleracao + j.giro

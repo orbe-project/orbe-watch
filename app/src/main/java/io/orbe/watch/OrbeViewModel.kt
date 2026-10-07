@@ -350,6 +350,8 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
     /** O fundo do menu atrás dos orbes. */
     fun fundo(v: Boolean) = mudarSinc { it.copy(fundo = v) }
 
+    fun fundoMenu(v: Boolean) = mudar { it.copy(fundoMenu = v) }
+
     /** O tamanho do orbe em tela: cada skin guarda o seu. */
     fun tamanho(v: Float) {
         val skin = aparencia.value.skin.id
@@ -442,6 +444,12 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
     /** A voz do orbe (no PC) fala [texto]: as instruções da calibração. */
     fun dizer(texto: String) {
         ponte.enviar("dizer " + texto.replace('\n', ' '))
+    }
+
+    /** O intervalo entre toques passa à escolha seguinte (e volta ao começo). */
+    fun proximoIntervalo() = mudar { a ->
+        val l = io.orbe.watch.gesto.Batida.INTERVALOS
+        a.copy(batidasIntervalo = l[(l.indexOf(a.batidasIntervalo) + 1) % l.size])
     }
 
     fun proximaBatida(i: Int) = mudar { a -> a.copy(batidasAcoes = proxima(a.batidasAcoes, i + 1, AcaoToque.CURTAS)) }
