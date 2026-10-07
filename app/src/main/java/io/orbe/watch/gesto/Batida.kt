@@ -65,12 +65,35 @@ private fun dot(a: FloatArray, b: FloatArray): Float {
 }
 
 /**
+ * A semelhança de duas formas com folga de alinhamento: o maior produto com uma
+ * delas deslocada até [FOLGA] amostras (o pico de um toque cai uma ou duas
+ * amostras para o lado, e sem a folga a mesma forma parecia outra).
+ */
+private fun parecidas(a: FloatArray, b: FloatArray): Float {
+    var melhor = -1f
+    for (d in -FOLGA..FOLGA) {
+        var s = 0f
+        for (c in 0 until 6) {
+            val o = c * AMOSTRAS
+            for (t in 0 until AMOSTRAS) {
+                val u = t + d
+                if (u in 0 until AMOSTRAS) s += a[o + t] * b[o + u]
+            }
+        }
+        if (s > melhor) melhor = s
+    }
+    return melhor
+}
+
+private const val FOLGA = 3
+
+/**
  * O perfil aprendido de uma força: a forma média das tentativas, o limiar de
  * semelhança (a menos parecida delas com a média, com folga) e a faixa da força
  * (média e desvio do logaritmo dos picos).
  */
 class Perfil(val forma: FloatArray, val limiar: Float, val mA: Float, val sA: Float, val mG: Float, val sG: Float) {
-    fun parecenca(j: Janela) = dot(j.forma, forma)
+    fun parecenca(j: Janela) = parecidas(j.forma, forma)
 
     /** a força da janela na faixa das tentativas (com folga para a calibração ser curta) */
     fun naFaixa(j: Janela): Boolean {
@@ -86,7 +109,7 @@ class Perfil(val forma: FloatArray, val limiar: Float, val mA: Float, val sA: Fl
             for (t in tentativas) for (i in m.indices) m[i] += t.forma[i]
             val n = sqrt(dot(m, m)).coerceAtLeast(1e-6f)
             for (i in m.indices) m[i] /= n
-            val limiar = (tentativas.minOf { dot(it.forma, m) } - 0.08f).coerceIn(0.35f, 0.9f)
+            val limiar = (tentativas.minOf { parecidas(it.forma, m) } - 0.08f).coerceIn(0.35f, 0.9f)
             val la = tentativas.map { ln(max(it.aceleracao, 1e-3f)) }
             val lg = tentativas.map { ln(max(it.giro, 1e-3f)) }
             return Perfil(m, limiar, media(la), desvio(la), media(lg), desvio(lg))
@@ -106,17 +129,22 @@ class Perfil(val forma: FloatArray, val limiar: Float, val mA: Float, val sA: Fl
  */
 class ModeloBatida(val fraca: Perfil?, val forte: Perfil?, val nada: List<Janela>, val gatilho: Float) {
 
-    /** A força do gesto, ou null (não é batida); o texto diz por quê. */
-    fun classificar(j: Janela): Pair<Forca?, String> {
+    /**
+     * A força do gesto, ou null (não é batida); o texto diz por quê. [emSequencia]:
+     * já há um toque contado e este chega no ritmo; o primeiro já provou que é
+     * gesto, e o seguinte só precisa parecer, não ser igual ([FOLGA_SEQUENCIA]).
+     */
+    fun classificar(j: Janela, emSequencia: Boolean = false): Pair<Forca?, String> {
         val candidatos = listOfNotNull(fraca?.let { Forca.FRACA to it }, forte?.let { Forca.FORTE to it })
         if (candidatos.isEmpty()) return null to "sem calibração"
         val (f, p, s) = candidatos.map { (f, p) -> Triple(f, p, p.parecenca(j)) }.maxBy { it.third }
-        val ruido = nada.maxOfOrNull { dot(it.forma, j.forma) } ?: -1f
+        val ruido = nada.maxOfOrNull { parecidas(it.forma, j.forma) } ?: -1f
+        val limiar = if (emSequencia) (p.limiar - FOLGA_SEQUENCIA).coerceAtLeast(0.2f) else p.limiar
         return when {
-            s < p.limiar -> null to "forma %.2f abaixo de %.2f (%s)".format(s, p.limiar, f)
+            s < limiar -> null to "forma %.2f abaixo de %.2f (%s)".format(s, limiar, f)
             !p.naFaixa(j) -> null to "força fora da faixa do %s".format(f)
             ruido >= s -> null to "mais parecido com o que não é batida (%.2f contra %.2f)".format(ruido, s)
-            else -> f to "forma %.2f: %s".format(s, f)
+            else -> f to "forma %.2f: %s%s".format(s, f, if (emSequencia) " (em sequência)" else "")
         }
     }
 
@@ -124,6 +152,7 @@ class ModeloBatida(val fraca: Perfil?, val forte: Perfil?, val nada: List<Janela
 
     companion object {
         const val GATILHO_PADRAO = 0.6f
+        const val FOLGA_SEQUENCIA = 0.15f
 
         /**
          * As tentativas sem as que são tremor: força abaixo de um quarto da mediana
@@ -279,7 +308,7 @@ class Batida(
         val j = Janela(forma, aMax, gMax)
         if (coletando) { janelas += j; return }
         val m = modelo ?: return
-        val (f, motivo) = m.classificar(j)
+        val (f, motivo) = m.classificar(j, emSequencia = pendente != null && picoMs - ultimaMs <= JUNTAR_MS)
         registros += "acel %.1f giro %.1f: %s".format(aMax, gMax, motivo)
         if (f != null) { janelas += j; TelaTocada.ultimoTrancoMs = picoMs; contar(picoMs, f) }
     }
