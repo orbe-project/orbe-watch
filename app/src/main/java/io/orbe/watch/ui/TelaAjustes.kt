@@ -61,7 +61,7 @@ enum class Aba(val nome: String, val icone: Int, val descricao: String) {
     AGENTES("Agentes", R.drawable.ic_agentes, "Toque num orbe para trocar o agente dele."),
     VOZ("Voz", R.drawable.ic_voz, ""),
     /** o que abre, conduz e fecha a sessão: os toques no orbe e as sacudidas */
-    ATIVACAO("Ativação", R.drawable.ic_ativacao, ""),
+    ATIVACAO("Gestos", R.drawable.ic_ativacao, ""),
 }
 
 /** Altura do orbe no alto da gaveta: com as duas fileiras de botões, a gaveta cabe na tela sem rolar. */
@@ -243,19 +243,19 @@ private fun MenuEscopo.sessao(vm: OrbeViewModel, ajustes: Ajustes, retrato: Retr
     }
     linha {
         LinhaSwitch(
-            "Modo live", retrato.travado,
-            subtitulo = "turnos sem tocar",
+            "Live", retrato.travado,
+            subtitulo = "conversa sem tocar",
             ativo = conectada && retrato.visivel,
         ) { vm.travar(it, podeGravar()) }
     }
     linha {
-        LinhaSwitch("Abrir já no live", ajustes.live) { vm.live(it) }
+        LinhaSwitch("Abrir sessão no live", ajustes.live) { vm.live(it) }
     }
-    grupo("Toques", "Um toque troca a ação.")
+    grupo("Toques na tela", "Toque numa linha para trocar a ação.")
     duas((1..ajustes.toques.size).map { n ->
         @Composable { Linha(if (n == 1) "1 toque" else "$n toques", subtitulo = ajustes.toque(n).nome, aoClicar = { vm.proximaAcao(n) }) }
     })
-    grupo("Tocar e segurar", "Os toques antes, o último segurado.")
+    grupo("Toques na tela, o último segurado")
     duas((1..ajustes.segurar.size).map { n ->
         @Composable { Linha(nomeSegurar(n), subtitulo = ajustes.segura(n).nome, aoClicar = { vm.proximaSegurar(n) }) }
     })
@@ -318,28 +318,28 @@ internal fun nomeAgente(ajustes: Ajustes, skin: Skin, agentesPc: List<AgenteInfo
 private fun MenuEscopo.aparencia(vm: OrbeViewModel, ajustes: Ajustes, glitch: Boolean, linhas: Boolean) {
     grupo("Aparência")
     linha {
-        LinhaSwitch("Glitch", glitch) { vm.glitch(it) }
+        LinhaSwitch("Glitch no orbe", glitch) { vm.glitch(it) }
     }
     linha {
-        LinhaSwitch("Linhas de TV", linhas, subtitulo = "linhas de varredura, como num tubo") { vm.linhas(it) }
+        LinhaSwitch("Linhas de TV no orbe", linhas) { vm.linhas(it) }
     }
     linha {
-        LinhaSwitch("Fundo atrás do orbe", ajustes.fundo) { vm.fundo(it) }
+        LinhaSwitch("Papel de parede no orbe", ajustes.fundo) { vm.fundo(it) }
     }
     linha {
-        LinhaSwitch("Fundo no menu", ajustes.fundoMenu) { vm.fundoMenu(it) }
+        LinhaSwitch("Papel de parede no menu", ajustes.fundoMenu) { vm.fundoMenu(it) }
     }
     linha {
-        LinhaSwitch("Texto do raciocínio", ajustes.texto) { vm.texto(it) }
+        LinhaSwitch("Mostrar o raciocínio", ajustes.texto) { vm.texto(it) }
     }
     linha {
-        LinhaSwitch("Seguir o orbe do PC", ajustes.seguirPc) { vm.seguirPc(it) }
+        LinhaSwitch("Usar o orbe do PC", ajustes.seguirPc) { vm.seguirPc(it) }
     }
 }
 
 private fun MenuEscopo.voz(vm: OrbeViewModel, ajustes: Ajustes, ponte: Ligacao.Conectada?, temSaidaDeSom: Boolean, pedirMicrofone: () -> Unit) {
     linha {
-        LinhaSwitch("Microfone do relógio", ajustes.microfone) {
+        LinhaSwitch("Ouvir pelo microfone do relógio", ajustes.microfone) {
             vm.microfone(it)
             if (it) pedirMicrofone()
         }
@@ -348,26 +348,26 @@ private fun MenuEscopo.voz(vm: OrbeViewModel, ajustes: Ajustes, ponte: Ligacao.C
         // o orbe de pulso fala só por aqui; o daemon do desktop também tem a voz do PC
         linha {
             LinhaSwitch(
-                "Voz no relógio", ajustes.voz,
+                "Falar pelo relógio", ajustes.voz,
                 subtitulo = if (ponte?.voz == false) "esta ponte fala pelo computador" else "",
             ) { vm.voz(it) }
         }
         if (ponte?.vozPc == true && ajustes.voz) {
             linha {
-                LinhaSwitch("Voz também no PC", ajustes.vozPc) { vm.vozPc(it) }
+                LinhaSwitch("Falar também pelo PC", ajustes.vozPc) { vm.vozPc(it) }
             }
         }
     }
     linha {
-        LinhaSwitch("Vibrar", ajustes.vibrar, subtitulo = "ao segurar e soltar") { vm.vibrar(it) }
+        LinhaSwitch("Vibrar ao segurar e soltar", ajustes.vibrar) { vm.vibrar(it) }
     }
     linha {
-        LinhaSwitch("Falar as etapas", ajustes.etapas, subtitulo = "o que o agente faz enquanto trabalha") { vm.etapas(it) }
+        LinhaSwitch("Narrar o que o agente faz", ajustes.etapas) { vm.etapas(it) }
     }
     if (ajustes.etapas) {
         linha {
             Linha(
-                "Idioma das etapas",
+                "Idioma da narração",
                 subtitulo = if (ajustes.idiomaEtapas == "original") "como o agente escreve" else "português",
                 aoClicar = { vm.proximoIdiomaEtapas() },
             )
@@ -376,40 +376,40 @@ private fun MenuEscopo.voz(vm: OrbeViewModel, ajustes: Ajustes, ponte: Ligacao.C
 }
 
 private fun MenuEscopo.gestos(vm: OrbeViewModel, ajustes: Ajustes, pedirMicrofone: () -> Unit, calibrar: (Calibracao) -> Unit) {
-    grupo("Gestos", "Sacudidas do pulso.")
+    grupo("Sacudidas")
     linha {
-        LinhaSwitch("Uma sacudida abre o orbe", ajustes.sacudida, subtitulo = "já ouvindo") {
+        LinhaSwitch("Abrir app com sacudida", ajustes.sacudida, subtitulo = "já ouvindo") {
             vm.sacudida(it)
             if (it) pedirMicrofone()
         }
     }
     linha {
         Linha(
-            "Calibrar o abrir",
+            "Calibrar sacudida de abrir",
             subtitulo = "fora ${um(ajustes.sacudidaFora)} · dentro ${um(ajustes.sacudidaDentro)} rad/s",
             ativo = ajustes.sacudida,
             aoClicar = { calibrar(Calibracao.ABRIR) },
         )
     }
     linha {
-        LinhaSwitch("Sacudida para fora sai do orbe", ajustes.sair) { vm.sair(it) }
+        LinhaSwitch("Fechar app com sacudida para fora", ajustes.sair) { vm.sair(it) }
     }
     linha {
         Linha(
-            "Calibrar o sair",
+            "Calibrar sacudida de fechar",
             subtitulo = if (ajustes.sairFora > 0f) "fora ${um(ajustes.sairFora)} rad/s" else "padrão: fora ${um(Sacudida.FORA_MIN)} rad/s",
             ativo = ajustes.sair,
             aoClicar = { calibrar(Calibracao.SAIR) },
         )
     }
-    grupo("Batidas", "Com o app aberto: toque fraco (dedo médio no dedão, ou na mesa) e estalo. Um toque troca a ação.")
+    grupo("Toques e estalos", "Com o app aberto: dedo médio no dedão, ou estalo. Toque numa linha para trocar a ação.")
     linha {
-        LinhaSwitch("Batidas e estalos", ajustes.batidas) { vm.batidas(it) }
+        LinhaSwitch("Comandar com toques e estalos", ajustes.batidas) { vm.batidas(it) }
     }
     linha {
         Linha(
             "Intervalo entre toques",
-            subtitulo = "%.1f s · também a espera até o comando".format(ajustes.batidasIntervalo / 1000.0).replace('.', ','),
+            subtitulo = "%.1f s, também a espera até o comando".format(ajustes.batidasIntervalo / 1000.0).replace('.', ','),
             ativo = ajustes.batidas,
             aoClicar = { vm.proximoIntervalo() },
         )
@@ -417,14 +417,14 @@ private fun MenuEscopo.gestos(vm: OrbeViewModel, ajustes: Ajustes, pedirMicrofon
     duas((0 until 4).map { i ->
         @Composable { Linha(nomeBatida(i), subtitulo = ajustes.batidasAcoes[i].nome, ativo = ajustes.batidas, aoClicar = { vm.proximaBatida(i) }) }
     })
-    grupo("Tocar e estalar", "Os toques antes, o último estala no mesmo movimento.")
+    grupo("Toques terminando em estalo", "O último toque já estala, no mesmo movimento.")
     duas((4 until 8).map { i ->
         @Composable { Linha(nomeBatida(i), subtitulo = ajustes.batidasAcoes[i].nome, ativo = ajustes.batidas, aoClicar = { vm.proximaBatida(i) }) }
     })
     duas(listOf(
-        Triple("Calibrar o toque fraco", ajustes.batidaFracas, Calibracao.FRACA),
-        Triple("Calibrar o estalo", ajustes.batidaFortes, Calibracao.FORTE),
-        Triple("O que não é batida", ajustes.batidaNada, Calibracao.NADA),
+        Triple("Calibrar toque", ajustes.batidaFracas, Calibracao.FRACA),
+        Triple("Calibrar estalo", ajustes.batidaFortes, Calibracao.FORTE),
+        Triple("Gravar movimentos a ignorar", ajustes.batidaNada, Calibracao.NADA),
     ).map { (nome, guardado, tipo) ->
         @Composable {
             val n = remember(guardado) { if (guardado.isEmpty()) 0 else guardado.count { it == '|' } + 1 }

@@ -79,7 +79,7 @@ fun TelaCalibracao(
     val proposta = if (tentativas.size >= TENTATIVAS) limiares(tentativas) else null
     val lim = proposta ?: emUso
     MolduraRedonda(
-        "abrir",
+        "sacudida de abrir",
         dica = if (proposta != null) "fora ${um(proposta.fora)} · dentro ${um(proposta.dentro)} rad/s"
         else "pulso parado, sacuda para fora e de volta",
         amostras = Amostras(tentativas.size, TENTATIVAS, TENTATIVAS),
@@ -116,7 +116,7 @@ fun TelaCalibracaoSair(
     val proposta = if (foras.size >= TENTATIVAS) limiarSair(foras) else null
     val lim = proposta ?: emUso.takeIf { it > 0f } ?: Sacudida.FORA_MIN
     MolduraRedonda(
-        "sair",
+        "sacudida de fechar",
         dica = if (proposta != null) "fora ${um(proposta)} rad/s" else "pulso parado, sacuda só para fora",
         amostras = Amostras(foras.size, TENTATIVAS, TENTATIVAS),
         grafico = { m -> GraficoSacudida(tracos.toList(), lim, null, "lim ${um(lim)}", m) },
@@ -189,9 +189,9 @@ fun TelaCalibracaoBatida(
         }
     }
     val titulo = when (tipo) {
-        Calibracao.FRACA -> "toque fraco"
-        Calibracao.FORTE -> "estalo"
-        else -> "o que não é batida"
+        Calibracao.FRACA -> "calibrar toque"
+        Calibracao.FORTE -> "calibrar estalo"
+        else -> "movimentos a ignorar"
     }
     val dica = when {
         nada && !pronta -> "digite, toque a tela, mexa o braço · $restante s"

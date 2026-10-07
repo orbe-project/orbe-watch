@@ -336,7 +336,7 @@ class ServicoSacudida : Service(), SensorEventListener2 {
         val abrir = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         return Notification.Builder(this, CANAL)
             .setSmallIcon(R.drawable.ic_launcher_monochrome)
-            .setContentTitle("Uma sacudida abre o orbe")
+            .setContentTitle("Abrir app com sacudida")
             .setContentIntent(abrir)
             .setOngoing(true)
             .build()

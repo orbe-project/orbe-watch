@@ -18,21 +18,21 @@ import kotlinx.coroutines.flow.map
 /** O que um número de toques no orbe faz: todos curtos ([Ajustes.toques]) ou o último segurado ([Ajustes.segurar]). */
 enum class AcaoToque(val id: String, val nome: String) {
     /** fechado, abre (ou já no live, com a opção); aberto, entra no live; no live, interrompe, e só ouvindo, fecha */
-    ABRIR("abrir", "Abrir"),
+    ABRIR("abrir", "Abrir sessão"),
     /** o live liga (abrindo, se precisar) ou, ligado, fecha */
-    LIVE("live", "Live"),
+    LIVE("live", "Ligar ou desligar live"),
     /** fecha a sessão e, com o Claude no orbe, a sessão dele no PC */
-    ENCERRAR("encerrar", "Encerrar"),
+    ENCERRAR("encerrar", "Encerrar sessão"),
     /** as sessões passadas do agente do orbe, para retomar uma */
-    HISTORICO("historico", "Histórico"),
+    HISTORICO("historico", "Abrir histórico"),
     /** segurar para falar: a fala vai enquanto o dedo fica (só no toque segurado) */
-    FALAR("falar", "Falar"),
+    FALAR("falar", "Falar enquanto segura"),
     /** o orbe seguinte da lista (como a coroa para baixo) */
     PROXIMO("proximo", "Próximo orbe"),
     /** o orbe anterior da lista */
     ANTERIOR("anterior", "Orbe anterior"),
     /** o raciocínio do agente do orbe passa ao nível seguinte (vale na próxima sessão dele) */
-    RACIOCINIO("raciocinio", "Raciocínio"),
+    RACIOCINIO("raciocinio", "Trocar raciocínio"),
     NADA("nada", "Nada");
 
     companion object {
