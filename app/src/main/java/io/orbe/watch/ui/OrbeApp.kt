@@ -189,49 +189,59 @@ fun OrbeApp(
                 )
             }
         }
-        when (calibrando) {
-            Calibracao.ABRIR -> TelaCalibracao(
-                Picos(ajustes.sacudidaFora, ajustes.sacudidaDentro), redonda,
-                salvar = {
-                    vm.calibrarSacudida(it)
-                    calibrando = null
-                },
-                padrao = {
-                    vm.sacudidaPadrao()
-                    calibrando = null
-                },
-            )
-            Calibracao.SAIR -> TelaCalibracaoSair(
-                ajustes.sairFora, redonda,
-                salvar = {
-                    vm.calibrarSair(it)
-                    calibrando = null
-                },
-                padrao = {
-                    vm.calibrarSair(0f)
-                    calibrando = null
-                },
-            )
-            Calibracao.FRACA, Calibracao.FORTE, Calibracao.NADA -> {
-                val tipo = calibrando!!
-                val n = Janela.lista(when (tipo) {
-                    Calibracao.FRACA -> ajustes.batidaFracas
-                    Calibracao.FORTE -> ajustes.batidaFortes
-                    else -> ajustes.batidaNada
-                }).size
-                TelaCalibracaoBatida(
-                    tipo, emUso = if (n > 0) "$n exemplos" else "sem calibrar", redonda,
-                    salvar = {
-                        vm.calibrarBatidas(tipo, it)
-                        calibrando = null
-                    },
-                    padrao = {
-                        vm.batidasPadrao()
-                        calibrando = null
-                    },
-                )
+        // arrastar para a direita numa calibração volta ao menu (como o histórico):
+        // sem a caixa, o arraste ia ao sistema, que fechava o app inteiro
+        if (calibrando != null) CompositionLocalProvider(
+            LocalSwipeToDismissBackgroundScrimColor provides Color.Transparent,
+            LocalSwipeToDismissContentScrimColor provides Color.Transparent,
+        ) {
+            BasicSwipeToDismissBox(onDismissed = { calibrando = null }) { fundo ->
+                if (fundo) return@BasicSwipeToDismissBox
+                when (calibrando) {
+                    Calibracao.ABRIR -> TelaCalibracao(
+                        Picos(ajustes.sacudidaFora, ajustes.sacudidaDentro), redonda,
+                        salvar = {
+                            vm.calibrarSacudida(it)
+                            calibrando = null
+                        },
+                        padrao = {
+                            vm.sacudidaPadrao()
+                            calibrando = null
+                        },
+                    )
+                    Calibracao.SAIR -> TelaCalibracaoSair(
+                        ajustes.sairFora, redonda,
+                        salvar = {
+                            vm.calibrarSair(it)
+                            calibrando = null
+                        },
+                        padrao = {
+                            vm.calibrarSair(0f)
+                            calibrando = null
+                        },
+                    )
+                    Calibracao.FRACA, Calibracao.FORTE, Calibracao.NADA -> {
+                        val tipo = calibrando!!
+                        val n = Janela.lista(when (tipo) {
+                            Calibracao.FRACA -> ajustes.batidaFracas
+                            Calibracao.FORTE -> ajustes.batidaFortes
+                            else -> ajustes.batidaNada
+                        }).size
+                        TelaCalibracaoBatida(
+                            tipo, emUso = if (n > 0) "$n exemplos" else "sem calibrar", redonda,
+                            salvar = {
+                                vm.calibrarBatidas(tipo, it)
+                                calibrando = null
+                            },
+                            padrao = {
+                                vm.batidasPadrao()
+                                calibrando = null
+                            },
+                        )
+                    }
+                    null -> Unit
+                }
             }
-            null -> Unit
         }
         historico?.let { h ->
             // arrastar para a direita fecha só o histórico e volta ao orbe: sem a
@@ -300,9 +310,12 @@ private fun BatidasNoPulso(
                     Sensor.TYPE_ACCELEROMETER -> {
                         batida.acel(event.timestamp / 1_000_000, x, y, z)
                         for (r in batida.tirarRegistros()) Log.i("OrbeBatida", r)
+                        // o aviso vibra já aqui, na linha dos sensores: postado na principal
+                        // (que engasga) ele caía a esmo, às vezes em cima da batida seguinte
                         for (jn in batida.tirarJanelas()) {
                             val forte = modelo.classificar(jn).first == Forca.FORTE
-                            principal.post { aviso[0](forte) }
+                            Log.i("OrbeBatida", "aviso ${if (forte) "FORTE" else "FRACA"} vibrando")
+                            aviso[0](forte)
                         }
                         for (c in batida.tirarComandos()) {
                             Log.i("OrbeBatida", "comando ${c.forca} x${c.vezes}")

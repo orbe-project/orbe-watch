@@ -31,7 +31,7 @@ data class Comando(val forca: Forca, val vezes: Int) {
 }
 
 const val AMOSTRAS = 35                     // ~350 ms a 100 Hz
-private const val ANTES = 8                 // amostras antes do pico na janela
+const val ANTES = 8                 // amostras antes do pico na janela
 const val DIMENSAO = AMOSTRAS * 6
 
 /**
@@ -219,6 +219,7 @@ class Batida(
         }
         if (ms < TelaTocada.vibrandoAte) {
             // a média não bebe o tremor do motor: senão a segunda batida, logo depois, é recusada
+            if (picoEm >= 0 || e >= gatilho) registros += "pulso %.2f perdido na vibração".format(e)
             picoEm = -1
             if (pendente != null && ms - ultimaMs > JUNTAR_MS) soltar()
             return
