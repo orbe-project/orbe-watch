@@ -10,7 +10,10 @@ import kotlin.math.sqrt
  * marcam até quando (ms desde o boot, a base dos sensores) o detector fica surdo.
  */
 object TelaTocada {
+    /** o dedo na tela: até aqui nada conta, e o comando em curso cai */
     @Volatile var surdoAte = 0L
+    /** a vibração do aviso: até aqui nada conta, mas o comando em curso segue (ele é o que vibrou) */
+    @Volatile var vibrandoAte = 0L
     /** o último candidato a batida (ms desde o boot): o estalo gira o pulso e a sacudida de sair não pode valer nele */
     @Volatile var ultimoTrancoMs = 0L
 }
@@ -132,8 +135,8 @@ class ModeloBatida(val fraca: Perfil?, val forte: Perfil?, val nada: List<Janela
  *
  * Os comandos: batidas da mesma força dentro de [JUNTAR_MS] somam; a pressão
  * do dedo antes do estalo e o rebote depois dele são do estalo; um terceiro na
- * janela cancela (digitar); com o dedo na tela ou a vibração, nada conta; no
- * uso, só com o antebraço [ELEVACAO_MIN_GRAUS] acima da horizontal.
+ * janela cancela (digitar); com o dedo na tela ou a vibração, nada conta. Vale
+ * em qualquer posição do braço: o perfil já separa o gesto do resto.
  */
 class Batida(
     var modelo: ModeloBatida?,
@@ -152,7 +155,6 @@ class Batida(
     private var picoEm = -1L
     private var picoE = 0f
     private var picoMs = 0L
-    private val gravidade = FloatArray(3)
     private var surdoAte = 0L
     // os comandos
     private var pendente: Forca? = null
@@ -194,10 +196,15 @@ class Batida(
             media += (e - media) * 0.05f
             return
         }
+        if (ms < TelaTocada.vibrandoAte) {
+            // a média não bebe o tremor do motor: senão a segunda batida, logo depois, é recusada
+            picoEm = -1
+            if (pendente != null && ms - ultimaMs > JUNTAR_MS) soltar()
+            return
+        }
         if (picoEm < 0) {
             if (e >= gatilho && media < gatilho * QUIETO && ms >= surdoAte) {
                 picoEm = n - 1; picoE = e; picoMs = ms
-                for (c in 0 until 3) gravidade[c] = lenta[c]
                 TelaTocada.ultimoTrancoMs = ms
             } else {
                 media += (e - media) * 0.05f
@@ -243,16 +250,9 @@ class Batida(
         val j = Janela(forma, aMax, gMax)
         if (coletando) { janelas += j; return }
         val m = modelo ?: return
-        if (!naPostura()) { registros += "acel %.1f giro %.1f: braço abaixo de 15°".format(aMax, gMax); return }
         val (f, motivo) = m.classificar(j)
         registros += "acel %.1f giro %.1f: %s".format(aMax, gMax, motivo)
         if (f != null) { janelas += j; contar(picoMs, f) }
-    }
-
-    /** O antebraço pelo menos [ELEVACAO_MIN_GRAUS] acima da horizontal: x do relógio corre ao longo dele. */
-    private fun naPostura(): Boolean {
-        val g = sqrt(gravidade[0] * gravidade[0] + gravidade[1] * gravidade[1] + gravidade[2] * gravidade[2])
-        return g > 1f && gravidade[0] / g >= SEN_ELEVACAO
     }
 
     private fun contar(ms: Long, f: Forca) {
@@ -293,9 +293,7 @@ class Batida(
         private const val SURDO_MS = 400L
         private const val PRE_ESTALO_MS = 350L
         private const val RAIZ2 = 1.41421f
-        const val JUNTAR_MS = 750L               // os pares do Davi: 650 a 1090 ms
-        const val ELEVACAO_MIN_GRAUS = 15
-        private const val SEN_ELEVACAO = 0.2588f // sen 15°
+        const val JUNTAR_MS = 1100L              // os pares do Davi: 650 a 1090 ms
 
         /** um número só para comparar a força de duas janelas */
         fun forca(j: Janela) = j.aceleracao + j.giro

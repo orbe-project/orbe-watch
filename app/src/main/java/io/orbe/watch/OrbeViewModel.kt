@@ -975,7 +975,7 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun avisarBatida(forte: Boolean) {
         // o motor de vibração balança o relógio: o detector fica surdo enquanto vibra
-        io.orbe.watch.gesto.TelaTocada.surdoAte = android.os.SystemClock.elapsedRealtime() + if (forte) 250 else 150
+        io.orbe.watch.gesto.TelaTocada.vibrandoAte = android.os.SystemClock.elapsedRealtime() + if (forte) 250 else 150
         try {
             vibrador?.vibrate(
                 if (forte) VibrationEffect.createWaveform(longArrayOf(0, 25, 60, 25), -1)
