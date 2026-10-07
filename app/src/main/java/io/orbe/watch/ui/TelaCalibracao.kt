@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
@@ -29,6 +30,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.size
+import androidx.wear.compose.foundation.CurvedDirection
+import androidx.wear.compose.foundation.CurvedLayout
+import androidx.wear.compose.foundation.CurvedTextStyle
+import androidx.wear.compose.foundation.basicCurvedText
 import io.orbe.watch.gesto.Batida
 import io.orbe.watch.gesto.Janela
 import io.orbe.watch.gesto.ModeloBatida
@@ -123,6 +130,7 @@ fun TelaCalibracaoBatida(
     redonda: Boolean,
     salvar: (List<Janela>) -> Unit,
     padrao: () -> Unit,
+    dizer: (String) -> Unit = {},
 ) {
     val janelas = remember { mutableStateListOf<Janela>() }
     val batida = remember { Batida(null, coletando = true) }
@@ -162,30 +170,84 @@ fun TelaCalibracaoBatida(
         }
     }
     val pronta = if (nada) restante == 0 else janelas.size >= TENTATIVAS_BATIDA
+    // a voz do orbe diz a posição do braço a cada troca, e o fim
+    val etapa = if (nada) -1 else if (pronta) 99 else janelas.size / POR_POSICAO
+    LaunchedEffect(etapa) {
+        when {
+            nada -> Unit
+            pronta -> dizer("Pronto. Pode salvar.")
+            else -> dizer(posicao(janelas.size))
+        }
+    }
     val titulo = when (tipo) {
-        Calibracao.FRACA -> "Calibrar o toque fraco"
-        Calibracao.FORTE -> "Calibrar o estalo"
-        else -> "O que não é batida"
+        Calibracao.FRACA -> "toque fraco"
+        Calibracao.FORTE -> "estalo"
+        else -> "o que não é batida"
     }
-    val aviso = when {
-        nada && !pronta -> "Digite, toque a tela, mexa o braço como sempre. Gravando: $restante s."
-        nada -> "${janelas.size} movimentos guardados para recusar."
-        pronta -> "Pronto: ${janelas.size} tentativas."
-        tipo == Calibracao.FRACA -> "Um toque do dedo médio no dedão. ${posicao(janelas.size)} Tentativa ${janelas.size + 1} de $TENTATIVAS_BATIDA."
-        else -> "Um estalo. ${posicao(janelas.size)} Tentativa ${janelas.size + 1} de $TENTATIVAS_BATIDA."
+    val dica = when {
+        nada && !pronta -> "digite, toque a tela, mexa o braço · $restante s"
+        nada -> "${janelas.size} movimentos para recusar"
+        pronta -> "pronto"
+        tipo == Calibracao.FRACA -> "dedo médio no dedão"
+        else -> "um estalo de dedos"
     }
-    Moldura(
-        titulo, redonda,
-        aviso = aviso,
-        // as tentativas estão no gráfico: a lista de números não diz mais nada
-        tentativas = emptyList(),
-        grafico = { GraficoPerfil(janelas.toList(), if (nada || pronta) null else posicaoCurta(janelas.size)) },
+    MolduraRedonda(
+        titulo, dica,
         amostras = if (nada) null else Amostras(janelas.size, TENTATIVAS_BATIDA, POR_POSICAO),
-        padrao = "apagar as três calibrações", aoPadrao = padrao,
+        grafico = { m -> GraficoPerfil(janelas.toList(), if (nada || pronta) null else posicaoCurta(janelas.size), m) },
+        mostrarPadrao = janelas.isEmpty() && (!nada || restante == SEGUNDOS_NADA), aoPadrao = padrao,
         pronta = pronta, refazer = { janelas.clear(); tempos[1] = 0L; restante = if (nada) SEGUNDOS_NADA else 0 },
         salvar = { salvar(janelas.toList()) },
-        emUso = emUso,
     )
+}
+
+/**
+ * A calibração das batidas no mostrador redondo: o gráfico no centro exato da
+ * tela, concêntrico com as barras das amostras na borda; o título curvo no
+ * alto e a dica curva no pé, na faixa entre o gráfico e a borda; os botões
+ * só quando servem (Padrão antes da primeira tentativa, Refazer e Salvar no fim).
+ */
+@Composable
+private fun MolduraRedonda(
+    titulo: String,
+    dica: String,
+    amostras: Amostras?,
+    grafico: @Composable (Modifier) -> Unit,
+    mostrarPadrao: Boolean,
+    aoPadrao: () -> Unit,
+    pronta: Boolean,
+    refazer: () -> Unit,
+    salvar: () -> Unit,
+) {
+    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        FundoVidro()
+        val lado = minOf(maxWidth, maxHeight)
+        amostras?.let { AnelAmostras(it, Modifier.size(lado)) }
+        grafico(Modifier.size(lado * 0.78f))
+        val cor = Estilo.texto.alfa(0.7f)
+        CurvedLayout(Modifier.size(lado - 14.dp), anchor = 270f) {
+            basicCurvedText(titulo, style = { CurvedTextStyle(color = cor, fontSize = 10.sp) })
+        }
+        CurvedLayout(Modifier.size(lado - 14.dp), anchor = 90f, angularDirection = CurvedDirection.Angular.Reversed) {
+            basicCurvedText(
+                dica, angularDirection = CurvedDirection.Angular.Reversed,
+                style = { CurvedTextStyle(color = cor, fontSize = 9.sp) },
+            )
+        }
+        if (pronta || mostrarPadrao) {
+            Row(
+                Modifier.align(Alignment.BottomCenter).padding(bottom = lado * 0.17f),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (pronta) {
+                    Botao("Refazer", aoClicar = refazer)
+                    Botao("Salvar", destaque = true, aoClicar = salvar)
+                } else {
+                    Botao("Padrão", aoClicar = aoPadrao)
+                }
+            }
+        }
+    }
 }
 
 /** A tela das calibrações, sobre o mesmo fundo do menu. */

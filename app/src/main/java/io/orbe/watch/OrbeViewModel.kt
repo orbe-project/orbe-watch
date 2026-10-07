@@ -425,6 +425,11 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
         _ajustes.value.batidasAcoes.getOrNull(i)?.let { executar(it, podeGravar) }
     }
 
+    /** A voz do orbe (no PC) fala [texto]: as instruções da calibração. */
+    fun dizer(texto: String) {
+        ponte.enviar("dizer " + texto.replace('\n', ' '))
+    }
+
     fun proximaBatida(i: Int) = mudar { a -> a.copy(batidasAcoes = proxima(a.batidasAcoes, i + 1, AcaoToque.CURTAS)) }
 
     /** O fora mínimo de sair, da calibração; 0 volta ao padrão. */

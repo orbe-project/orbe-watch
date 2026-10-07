@@ -237,6 +237,7 @@ fun OrbeApp(
                                 vm.batidasPadrao()
                                 calibrando = null
                             },
+                            dizer = vm::dizer,
                         )
                     }
                     null -> Unit

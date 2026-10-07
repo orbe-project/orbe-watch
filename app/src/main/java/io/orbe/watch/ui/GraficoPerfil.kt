@@ -48,7 +48,7 @@ import kotlin.math.sqrt
  * numa régua logarítmica; no meio, quantas e o limiar.
  */
 @Composable
-fun GraficoPerfil(janelas: List<Janela>, posicao: String? = null) {
+fun GraficoPerfil(janelas: List<Janela>, posicao: String? = null, modifier: Modifier = Modifier) {
     val accent = Estilo.accent
     val texto = Estilo.texto
     val curvas = remember(janelas.size, janelas.lastOrNull()) {
@@ -56,7 +56,7 @@ fun GraficoPerfil(janelas: List<Janela>, posicao: String? = null) {
     }
     val perfil = remember(janelas.size, janelas.lastOrNull()) { Perfil.de(janelas) }
     val forcas = janelas.map { it.aceleracao + it.giro }
-    Box(Modifier.fillMaxWidth(0.86f).aspectRatio(1f), contentAlignment = Alignment.Center) {
+    Box(modifier.aspectRatio(1f), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxWidth().aspectRatio(1f)) {
             val raio = min(size.width, size.height) / 2
             // anéis: o de fora (aceleração) de 0,62 a 0,86 do raio, o de dentro (giro) de 0,36 a 0,58
@@ -83,12 +83,6 @@ fun GraficoPerfil(janelas: List<Janela>, posicao: String? = null) {
             Texto("${janelas.size}", Estilo.grupo, cor = texto)
             Texto(perfil?.let { "lim ${um2(it.limiar)}" } ?: "mín. 3", Estilo.mono, cor = texto.alfa(0.55f), alinhar = TextAlign.Center)
         }
-    }
-    if (forcas.isNotEmpty()) {
-        Texto(
-            "ACEL fora · GIRO dentro · força ${um1(forcas.min())} a ${um1(forcas.max())}",
-            Estilo.mono, cor = texto.alfa(0.55f), alinhar = TextAlign.Center,
-        )
     }
 }
 
