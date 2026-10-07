@@ -109,6 +109,13 @@ class MainActivity : ComponentActivity() {
         s.getDefaultSensor(Sensor.TYPE_GYROSCOPE)?.let { s.registerListener(sair, it, SensorManager.SENSOR_DELAY_GAME) }
     }
 
+    // o dedo na tela manda tranco pelo pulso: as batidas ficam surdas enquanto ele
+    // está lá e um pouco depois de sair
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent): Boolean {
+        io.orbe.watch.gesto.TelaTocada.surdoAte = android.os.SystemClock.elapsedRealtime() + 400
+        return super.dispatchTouchEvent(ev)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Na frente, a tela não apaga pelo tempo sem toque. Abaixar ou virar o

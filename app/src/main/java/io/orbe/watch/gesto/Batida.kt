@@ -2,6 +2,15 @@ package io.orbe.watch.gesto
 
 import kotlin.math.sqrt
 
+/**
+ * O dedo na tela: tocar o relógio manda tranco pelo pulso como uma batida.
+ * A MainActivity marca até quando (relógio do sistema, ms desde o boot, a base
+ * dos sensores) o detector fica surdo.
+ */
+object TelaTocada {
+    @Volatile var surdoAte = 0L
+}
+
 /** A força de uma batida: o toque fraco (dedo médio no dedão, ou a ponta dos dedos na mesa) ou o estalo. */
 enum class Forca { FRACA, FORTE }
 
@@ -71,6 +80,12 @@ class Batida(
         lx += (x - lx) * LENTA; ly += (y - ly) * LENTA; lz += (z - lz) * LENTA
         val dx = x - lx; val dy = y - ly; val dz = z - lz
         val tranco = sqrt(dx * dx + dy * dy + dz * dz)
+        if (ms < TelaTocada.surdoAte) {
+            // o dedo está (ou acabou de estar) na tela: nada conta, e o comando em curso cai
+            emPico = false; pendente = null; vezes = 0
+            ruido += (tranco - ruido) * 0.08f
+            return
+        }
         if (!emPico) {
             val quieto = ruido < QUIETO && giroMedio < GIRO_QUIETO
             if (quieto && ms >= bloqueadoAte && tranco >= fracaMin * GATILHO) {
