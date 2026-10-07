@@ -1,5 +1,20 @@
 package io.orbe.watch.ui
 
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import io.orbe.watch.gesto.Batida
+import io.orbe.watch.gesto.Forca
+import io.orbe.watch.gesto.Comando
 import androidx.wear.compose.foundation.BasicSwipeToDismissBox
 import androidx.wear.compose.foundation.LocalSwipeToDismissBackgroundScrimColor
 import androidx.wear.compose.foundation.LocalSwipeToDismissContentScrimColor
@@ -77,6 +92,20 @@ fun OrbeApp(
     val giro = remember { floatArrayOf(0f) }
     // a calibração da sacudida cobre o menu até salvar ou voltar
     var calibrando by remember { mutableStateOf<Calibracao?>(null) }
+
+    // as batidas, com o app aberto e fora das calibrações: fraca troca de orbe
+    // (como a coroa), o estalo abre e fecha o live, dois fecham o chat
+    BatidasNoPulso(
+        ligado = ajustes.batidas && calibrando == null,
+        fracaMin = if (ajustes.batidaFraca > 0f) ajustes.batidaFraca else Batida.FRACA_MIN,
+        forteMin = if (ajustes.batidaForte > 0f) ajustes.batidaForte else Batida.FORTE_MIN,
+    ) { c ->
+        if (c.forca == Forca.FRACA) {
+            if (paginas.currentPage == 0 && historico == null) coroa.tryEmit(if (c.vezes >= 2) -1 else 1)
+        } else {
+            vm.estalo(c.vezes, podeGravar())
+        }
+    }
 
     // com a sessão aberta a tela não apaga no meio da conversa
     val view = LocalView.current
@@ -178,6 +207,23 @@ fun OrbeApp(
                     calibrando = null
                 },
             )
+            Calibracao.FRACA, Calibracao.FORTE -> {
+                val forca = if (calibrando == Calibracao.FRACA) Forca.FRACA else Forca.FORTE
+                TelaCalibracaoBatida(
+                    forca,
+                    emUso = if (forca == Forca.FRACA) (if (ajustes.batidaFraca > 0f) "%.1f m/s²".format(ajustes.batidaFraca) else "o padrão")
+                    else (if (ajustes.batidaForte > 0f) "%.1f m/s²".format(ajustes.batidaForte) else "o padrão"),
+                    redonda,
+                    salvar = {
+                        if (forca == Forca.FRACA) vm.calibrarFraca(it) else vm.calibrarForte(it)
+                        calibrando = null
+                    },
+                    padrao = {
+                        vm.batidasPadrao()
+                        calibrando = null
+                    },
+                )
+            }
             null -> Unit
         }
         historico?.let { h ->
@@ -219,3 +265,56 @@ fun OrbeApp(
 
 /** Pixels de giro da coroa por orbe da lista. */
 private const val GIRO_POR_PASSO = 90f
+
+/**
+ * O detector de batidas ([Batida]) ligado ao acelerômetro e ao giroscópio no
+ * mais rápido enquanto o app está aberto e [ligado]; cada comando vai a [aoComando].
+ */
+@Composable
+private fun BatidasNoPulso(ligado: Boolean, fracaMin: Float, forteMin: Float, aoComando: (Comando) -> Unit) {
+    val ctx = LocalContext.current
+    val acao = remember { arrayOf(aoComando) }
+    acao[0] = aoComando
+    val dono = LocalLifecycleOwner.current
+    DisposableEffect(ligado, fracaMin, forteMin, dono) {
+        if (!ligado) return@DisposableEffect onDispose { }
+        val batida = Batida(fracaMin, forteMin)
+        val principal = Handler(Looper.getMainLooper())
+        val sensores = ctx.getSystemService(SensorManager::class.java)
+        val ouvinte = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                val (x, y, z) = event.values
+                when (event.sensor.type) {
+                    Sensor.TYPE_ACCELEROMETER -> {
+                        batida.acel(event.timestamp / 1_000_000, x, y, z)
+                        for (m in batida.tirarMedidas()) Log.i("OrbeBatida", "pico %.1f giro %.1f largura %d".format(m.pico, m.giro, m.largura))
+                        for (c in batida.tirarComandos()) {
+                            Log.i("OrbeBatida", "comando ${c.forca} x${c.vezes}")
+                            principal.post { acao[0](c) }
+                        }
+                    }
+                    Sensor.TYPE_GYROSCOPE -> batida.giro(x, y, z)
+                }
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+        }
+        // só com o app na frente: pausado, os sensores saem
+        val ciclo = LifecycleEventObserver { _, e ->
+            when (e) {
+                Lifecycle.Event.ON_RESUME -> {
+                    batida.zerar()
+                    sensores?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let { sensores.registerListener(ouvinte, it, SensorManager.SENSOR_DELAY_FASTEST) }
+                    sensores?.getDefaultSensor(Sensor.TYPE_GYROSCOPE)?.let { sensores.registerListener(ouvinte, it, SensorManager.SENSOR_DELAY_FASTEST) }
+                }
+                Lifecycle.Event.ON_PAUSE -> sensores?.unregisterListener(ouvinte)
+                else -> Unit
+            }
+        }
+        dono.lifecycle.addObserver(ciclo)
+        onDispose {
+            dono.lifecycle.removeObserver(ciclo)
+            sensores?.unregisterListener(ouvinte)
+        }
+    }
+}

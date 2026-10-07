@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.orbe.watch.gesto.Batida
+import io.orbe.watch.gesto.Forca
 import io.orbe.watch.gesto.Picos
 import io.orbe.watch.gesto.Sacudida
 import io.orbe.watch.gesto.ServicoSacudida
@@ -34,7 +36,7 @@ import io.orbe.watch.gesto.limiares
 import kotlin.math.sqrt
 
 /** Qual sacudida a tela de calibração mede. */
-enum class Calibracao { ABRIR, SAIR }
+enum class Calibracao { ABRIR, SAIR, FRACA, FORTE }
 
 /**
  * Calibração da sacudida de abrir (a do HinaWatch): mede [TENTATIVAS] sacudidas
@@ -103,7 +105,45 @@ fun TelaCalibracaoSair(
     )
 }
 
-/** A tela das duas calibrações, sobre o mesmo fundo do menu. */
+/**
+ * Calibração das batidas: [TENTATIVAS_BATIDA] da força escolhida (o toque fraco
+ * entre os dedos ou na mesa, ou o estalo), com o pulso parado antes de cada uma.
+ * Mede o pico do tranco de cada uma; o app propõe os limiares a partir delas.
+ */
+@Composable
+fun TelaCalibracaoBatida(
+    forca: Forca,
+    emUso: String,
+    redonda: Boolean,
+    salvar: (List<Float>) -> Unit,
+    padrao: () -> Unit,
+) {
+    val picos = remember { mutableStateListOf<Float>() }
+    // na calibração tudo que é tranco curto conta, de qualquer força
+    val batida = remember { Batida(fracaMin = 0.8f, forteMin = Float.MAX_VALUE) }
+    SensoresBatida(batida) {
+        for (m in batida.tirarMedidas()) {
+            Log.i("OrbeBatida", "calibração ${forca.name}: pico ${um(m.pico)} giro ${um(m.giro)} largura ${m.largura}")
+            if (picos.size < TENTATIVAS_BATIDA) picos += m.pico
+        }
+        batida.tirarComandos()
+    }
+    val fraca = forca == Forca.FRACA
+    val pronta = picos.size >= TENTATIVAS_BATIDA
+    Moldura(
+        if (fraca) "Calibrar o toque fraco" else "Calibrar o estalo", redonda,
+        aviso = if (pronta) "Picos de ${um(picos.min())} a ${um(picos.max())} m/s²"
+        else (if (fraca) "Pulso parado, um toque do dedo médio no dedão (ou na mesa)." else "Pulso parado, um estalo de dedos.") +
+            " Tentativa ${picos.size + 1} de $TENTATIVAS_BATIDA.",
+        tentativas = picos.map { "pico ${um(it)} m/s²" },
+        padrao = if (fraca) "fraca a partir de ${um(Batida.FRACA_MIN)}" else "forte a partir de ${um(Batida.FORTE_MIN)}",
+        aoPadrao = padrao,
+        pronta = pronta, refazer = { picos.clear() }, salvar = { salvar(picos.toList()) },
+        emUso = emUso,
+    )
+}
+
+/** A tela das calibrações, sobre o mesmo fundo do menu. */
 @Composable
 private fun Moldura(
     titulo: String,
@@ -192,9 +232,42 @@ private fun Sensores(sacudida: Sacudida, aoLer: () -> Unit) {
     }
 }
 
+/** Liga acelerômetro e giroscópio no mais rápido à [batida] enquanto a tela está aberta. */
+@Composable
+private fun SensoresBatida(batida: Batida, aoLer: () -> Unit) {
+    val ctx = LocalContext.current
+    val ler = remember { arrayOf(aoLer) }
+    ler[0] = aoLer
+    DisposableEffect(batida) {
+        ServicoSacudida.calibrando = true
+        val sensores = ctx.getSystemService(SensorManager::class.java)
+        val ouvinte = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                val (x, y, z) = event.values
+                when (event.sensor.type) {
+                    Sensor.TYPE_ACCELEROMETER -> {
+                        batida.acel(event.timestamp / 1_000_000, x, y, z)
+                        ler[0]()
+                    }
+                    Sensor.TYPE_GYROSCOPE -> batida.giro(x, y, z)
+                }
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
+        }
+        sensores?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let { sensores.registerListener(ouvinte, it, SensorManager.SENSOR_DELAY_FASTEST) }
+        sensores?.getDefaultSensor(Sensor.TYPE_GYROSCOPE)?.let { sensores.registerListener(ouvinte, it, SensorManager.SENSOR_DELAY_FASTEST) }
+        onDispose {
+            sensores?.unregisterListener(ouvinte)
+            ServicoSacudida.calibrando = false
+        }
+    }
+}
+
 private fun um(v: Float) = "%.1f".format(v).replace('.', ',')
 
 private const val TENTATIVAS = 3
+private const val TENTATIVAS_BATIDA = 5
 private const val ALFA_GRAVIDADE = 0.2f
 
 /** pico mínimo para uma tentativa contar (o dentro no abrir, o fora no sair): abaixo disso é o pulso se ajeitando */

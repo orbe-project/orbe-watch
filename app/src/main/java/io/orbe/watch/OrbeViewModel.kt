@@ -7,6 +7,7 @@ import android.os.Vibrator
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.orbe.watch.dados.AcaoToque
+import io.orbe.watch.gesto.limiaresBatida
 import io.orbe.watch.dados.AgenteInfo
 import io.orbe.watch.dados.Ajustes
 import io.orbe.watch.dados.AltoFalante
@@ -399,6 +400,33 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Com o orbe aberto, a sacudida só para fora sai dele. */
     fun sair(v: Boolean) = mudarSinc { it.copy(sair = v) }
+
+    fun batidas(v: Boolean) = mudar { it.copy(batidas = v) }
+
+    /** Calibração da batida fraca: os picos das tentativas. Refaz o forte se ele já foi calibrado. */
+    fun calibrarFraca(picos: List<Float>) = mudar { a ->
+        val (fraca, _) = limiaresBatida(picos, emptyList())
+        val topo = picos.max()
+        val forte = if (a.batidaForte > 0f && a.batidaFracaTopo > 0f) a.batidaForte else 0f
+        a.copy(batidaFraca = fraca, batidaFracaTopo = topo, batidaForte = forte)
+    }
+
+    /** Calibração do estalo: os picos das tentativas; o limiar fica entre ele e a fraca mais forte. */
+    fun calibrarForte(picos: List<Float>) = mudar { a ->
+        val fracas = if (a.batidaFracaTopo > 0f) listOf(a.batidaFraca / io.orbe.watch.gesto.MARGEM, a.batidaFracaTopo) else emptyList()
+        val (_, forte) = limiaresBatida(fracas, picos)
+        a.copy(batidaForte = forte)
+    }
+
+    fun batidasPadrao() = mudar { it.copy(batidaFraca = 0f, batidaFracaTopo = 0f, batidaForte = 0f) }
+
+    /**
+     * Um comando das batidas (só com o app aberto, no orbe): o estalo abre ou
+     * fecha o live; dois estalos fecham o chat. Trocar de orbe é da lista (a coroa).
+     */
+    fun estalo(vezes: Int, podeGravar: Boolean) {
+        if (vezes >= 2) executar(AcaoToque.ENCERRAR, podeGravar) else executar(AcaoToque.LIVE, podeGravar)
+    }
 
     /** O fora mínimo de sair, da calibração; 0 volta ao padrão. */
     fun calibrarSair(fora: Float) = mudarSinc { it.copy(sairFora = fora) }

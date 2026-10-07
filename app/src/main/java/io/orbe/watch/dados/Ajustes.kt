@@ -101,6 +101,13 @@ data class Ajustes(
     val sair: Boolean = true,
     /** o fora mínimo da sacudida de sair, em rad/s; 0 = sem calibrar, vale o padrão (o do HinaWatch, [Sacudida.FORA_MIN]) */
     val sairFora: Float = 0f,
+    /** com o app aberto, batidas no pulso: fraca troca de orbe, o estalo abre e fecha o live */
+    val batidas: Boolean = false,
+    /** limiares das batidas em m/s² de tranco; 0 = sem calibrar, vale o padrão ([Batida]) */
+    val batidaFraca: Float = 0f,
+    /** a batida fraca mais forte da calibração: o forte fica entre ela e o estalo mais fraco */
+    val batidaFracaTopo: Float = 0f,
+    val batidaForte: Float = 0f,
 ) {
     /** A ação de [n] toques curtos (1 a 4). */
     fun toque(n: Int): AcaoToque = toques.getOrNull(n - 1) ?: AcaoToque.NADA
@@ -209,6 +216,10 @@ class Cofre(private val ctx: Context) {
         val ordem = stringPreferencesKey("ordem")          // "anel,serafim_gravura,..."
         val sair = booleanPreferencesKey("sair")
         val sairFora = floatPreferencesKey("sair_fora")
+        val batidas = booleanPreferencesKey("batidas")
+        val batidaFraca = floatPreferencesKey("batida_fraca")
+        val batidaForte = floatPreferencesKey("batida_forte")
+        val batidaFracaTopo = floatPreferencesKey("batida_fraca_topo")
     }
 
     private fun lerAgentes(s: String?): Map<String, String> =
@@ -279,6 +290,10 @@ class Cofre(private val ctx: Context) {
             ordem = p[K.ordem].orEmpty().split(',').filter { it.isNotEmpty() },
             sair = p[K.sair] ?: d.sair,
             sairFora = p[K.sairFora] ?: d.sairFora,
+            batidas = p[K.batidas] ?: d.batidas,
+            batidaFraca = p[K.batidaFraca] ?: d.batidaFraca,
+            batidaForte = p[K.batidaForte] ?: d.batidaForte,
+            batidaFracaTopo = p[K.batidaFracaTopo] ?: d.batidaFracaTopo,
         )
     }
 
@@ -313,6 +328,10 @@ class Cofre(private val ctx: Context) {
             p[K.segurar] = a.segurar.joinToString(",") { it.id }
             p.remove(K.historico)
             p[K.sacudidaFora] = a.sacudidaFora
+            p[K.batidas] = a.batidas
+            p[K.batidaFraca] = a.batidaFraca
+            p[K.batidaForte] = a.batidaForte
+            p[K.batidaFracaTopo] = a.batidaFracaTopo
             p[K.sacudidaDentro] = a.sacudidaDentro
             p[K.ordem] = a.ordem.joinToString(",")
             p[K.sair] = a.sair

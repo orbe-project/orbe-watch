@@ -41,6 +41,7 @@ import io.orbe.watch.R
 import io.orbe.watch.dados.AgenteInfo
 import io.orbe.watch.dados.Ajustes
 import io.orbe.watch.dados.Ligacao
+import io.orbe.watch.gesto.Batida
 import io.orbe.watch.gesto.Sacudida
 import io.orbe.watch.orbe.Estado
 import io.orbe.watch.orbe.Retrato
@@ -388,6 +389,24 @@ private fun MenuEscopo.gestos(vm: OrbeViewModel, ajustes: Ajustes, pedirMicrofon
             subtitulo = if (ajustes.sairFora > 0f) "fora ${um(ajustes.sairFora)} rad/s" else "padrão: fora ${um(Sacudida.FORA_MIN)} rad/s",
             ativo = ajustes.sair,
             aoClicar = { calibrar(Calibracao.SAIR) },
+        )
+    }
+    grupo("Batidas", "Com o app aberto. Toque fraco: um desce a lista, dois sobem. Estalo: um abre ou fecha o live, dois fecham o chat.")
+    linha {
+        LinhaSwitch("Batidas e estalos", ajustes.batidas, subtitulo = "dedo médio no dedão (ou na mesa) e estalo") { vm.batidas(it) }
+    }
+    linha {
+        Linha(
+            "Calibrar o toque fraco",
+            subtitulo = if (ajustes.batidaFraca > 0f) "a partir de ${um(ajustes.batidaFraca)} m/s²" else "padrão: a partir de ${um(Batida.FRACA_MIN)} m/s²",
+            aoClicar = { calibrar(Calibracao.FRACA) },
+        )
+    }
+    linha {
+        Linha(
+            "Calibrar o estalo",
+            subtitulo = if (ajustes.batidaForte > 0f) "a partir de ${um(ajustes.batidaForte)} m/s²" else "padrão: a partir de ${um(Batida.FORTE_MIN)} m/s²",
+            aoClicar = { calibrar(Calibracao.FORTE) },
         )
     }
 }
