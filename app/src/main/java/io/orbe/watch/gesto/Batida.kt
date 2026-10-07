@@ -95,24 +95,39 @@ class Perfil(
     private val aceleracao: ClosedFloatingPointRange<Float>,
     private val giro: ClosedFloatingPointRange<Float>,
 ) {
-    fun parecenca(j: Janela) = exemplos.maxOf { parecidas(j.forma, it) }
+    fun parecenca(j: Janela) = vizinhos(j.forma, exemplos)
 
     /** a força da janela na faixa das tentativas, com folga para os lados */
     fun naFaixa(j: Janela) = j.aceleracao in aceleracao && j.giro in giro
 
     companion object {
-        private const val FOLGA_FORCA = 2f
+        private const val FOLGA_FORCA = 1.4f
+
+        /**
+         * A semelhança pelos dois exemplos mais parecidos (a média deles): um
+         * exemplo só parecido por acaso não basta, e cada posição tem cinco.
+         */
+        fun vizinhos(f: FloatArray, exemplos: List<FloatArray>): Float {
+            var a = -1f
+            var b = -1f
+            for (e in exemplos) {
+                val s = parecidas(f, e)
+                if (s > a) { b = a; a = s } else if (s > b) b = s
+            }
+            return if (b < -0.5f) a else (a + b) / 2
+        }
 
         fun de(tentativas: List<Janela>): Perfil? {
             if (tentativas.size < 3) return null
             val formas = tentativas.map { it.forma }
             // cada exemplo contra o mais parecido dos outros; o pior (o segundo pior
             // com bastante exemplo, para um só esquisito não afrouxar tudo) dá o limiar
-            val vizinhos = formas.indices.map { a ->
-                formas.indices.filter { it != a }.maxOf { b -> parecidas(formas[a], formas[b]) }
+            val proximos = formas.indices.map { a ->
+                vizinhos(formas[a], formas.filterIndexed { i, _ -> i != a })
             }.sorted()
-            val base = if (vizinhos.size >= 8) vizinhos[1] else vizinhos[0]
-            val limiar = (base - 0.08f).coerceIn(0.35f, 0.9f)
+            // o décimo percentil, sem folga: com muitas posições, o mínimo afrouxava demais
+            val base = proximos[proximos.size / 10]
+            val limiar = base.coerceIn(0.5f, 0.92f)
             val a = tentativas.map { it.aceleracao }
             val g = tentativas.map { it.giro }
             return Perfil(
@@ -139,8 +154,8 @@ class ModeloBatida(val fraca: Perfil?, val forte: Perfil?, val nada: List<Janela
         val candidatos = listOfNotNull(fraca?.let { Forca.FRACA to it }, forte?.let { Forca.FORTE to it })
         if (candidatos.isEmpty()) return null to "sem calibração"
         val (f, p, s) = candidatos.map { (f, p) -> Triple(f, p, p.parecenca(j)) }.maxBy { it.third }
-        val ruido = nada.maxOfOrNull { parecidas(it.forma, j.forma) } ?: -1f
-        val limiar = if (emSequencia) (p.limiar - FOLGA_SEQUENCIA).coerceAtLeast(0.2f) else p.limiar
+        val ruido = (nada.maxOfOrNull { parecidas(it.forma, j.forma) } ?: -1f) + MARGEM_NADA
+        val limiar = if (emSequencia) (p.limiar - FOLGA_SEQUENCIA).coerceAtLeast(0.4f) else p.limiar
         return when {
             s < limiar -> null to "forma %.2f abaixo de %.2f (%s)".format(s, limiar, f)
             !p.naFaixa(j) -> null to "força fora da faixa do %s".format(f)
@@ -153,7 +168,9 @@ class ModeloBatida(val fraca: Perfil?, val forte: Perfil?, val nada: List<Janela
 
     companion object {
         const val GATILHO_PADRAO = 0.6f
-        const val FOLGA_SEQUENCIA = 0.15f
+        const val FOLGA_SEQUENCIA = 0.1f
+        /** o que não é batida ganha empate com folga: parecido quase igual com os dois, recusa */
+        const val MARGEM_NADA = 0.05f
 
         /**
          * As tentativas sem as que são tremor: força abaixo de um quarto da mediana

@@ -16,6 +16,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -117,17 +119,11 @@ fun Botao(
 ) {
     val fonte = remember { MutableInteractionSource() }
     val apertado by fonte.collectIsPressedAsState()
-    val fundo = when {
-        destaque -> if (apertado) Estilo.accent.alfa(0.85f) else Estilo.accent
-        ligado -> Estilo.accent.alfa(if (apertado) 0.28f else 0.20f)
-        else -> Estilo.texto.alfa(if (apertado) 0.16f else 0.08f)
-    }
     Box(
         modifier
             .alpha(if (ativo) 1f else 0.4f)
             .height(if (destaque) 36.dp else 30.dp)
-            .clip(CircleShape)
-            .background(fundo)
+            .vidro(CircleShape, tinta = if (destaque) Estilo.accent else if (ligado) Estilo.accent.alfa(0.35f) else null, apertado = apertado)
             .clickable(fonte, indication = null, enabled = ativo, onClick = aoClicar)
             .padding(horizontal = if (destaque) 22.dp else 12.dp),
         contentAlignment = Alignment.Center,
@@ -151,8 +147,7 @@ fun BotaoIcone(icone: Int, modifier: Modifier = Modifier, ativo: Boolean = true,
         modifier
             .alpha(if (ativo) 1f else 0.4f)
             .size(28.dp)
-            .clip(CircleShape)
-            .background(Estilo.texto.alfa(if (apertado) 0.16f else 0.08f))
+            .vidro(CircleShape, apertado = apertado)
             .clickable(fonte, indication = null, enabled = ativo, onClick = aoClicar),
         contentAlignment = Alignment.Center,
     ) { Icone(icone, Estilo.texto, Modifier.size(16.dp)) }
@@ -175,15 +170,7 @@ fun BotaoGaveta(icone: Int, nome: String, ligado: Boolean = false, aoClicar: () 
         Box(
             Modifier
                 .size(46.dp)
-                .clip(CircleShape)
-                .background(
-                    when {
-                        ligado -> Estilo.accent.alfa(0.20f)
-                        apertado -> Estilo.accent.alfa(0.12f)
-                        else -> Estilo.vista.alfa(0.30f)
-                    },
-                )
-                .border(1.dp, Estilo.accent.alfa(if (ligado) 0.55f else 0.16f), CircleShape)
+                .vidro(CircleShape, tinta = if (ligado) Estilo.accent.alfa(0.35f) else null, apertado = apertado)
                 .clickable(fonte, indication = null, onClick = aoClicar),
             contentAlignment = Alignment.Center,
         ) { Icone(icone, if (ligado) Estilo.accent else Estilo.texto, Modifier.size(22.dp)) }
@@ -196,9 +183,7 @@ fun BotaoGaveta(icone: Int, nome: String, ligado: Boolean = false, aoClicar: () 
 fun Etiqueta(texto: String, modifier: Modifier = Modifier) {
     Box(
         modifier
-            .clip(RoundedCornerShape(7.dp))
-            .background(Estilo.accent.alfa(0.14f))
-            .border(1.dp, Estilo.accent.alfa(0.30f), RoundedCornerShape(7.dp))
+            .vidro(RoundedCornerShape(7.dp))
             .padding(horizontal = 7.dp, vertical = 3.dp),
     ) {
         Texto(texto, Estilo.mono.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold), linhas = 1)
@@ -208,8 +193,7 @@ fun Etiqueta(texto: String, modifier: Modifier = Modifier) {
 /** A caixa de vidro de um grupo do app (Grupo.qml): cada linha do menu tem a sua. */
 @Composable
 fun Modifier.caixa(): Modifier {
-    val forma = RoundedCornerShape(12.dp)
-    return fillMaxWidth().clip(forma).background(Estilo.vista.alfa(0.30f)).border(1.dp, Estilo.accent.alfa(0.16f), forma)
+    return fillMaxWidth().vidro(RoundedCornerShape(16.dp))
 }
 
 /**
@@ -242,8 +226,9 @@ class MenuEscopo internal constructor(
     fun duas(linhas: List<@Composable () -> Unit>) {
         linhas.chunked(2).forEach { par ->
             item {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    par.forEach { l -> Box(Modifier.weight(1f).caixa()) { l() } }
+                // as duas da fileira com a mesma altura, a da maior: não seguem o texto
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    par.forEach { l -> Box(Modifier.weight(1f).fillMaxHeight().caixa(), contentAlignment = Alignment.CenterStart) { l() } }
                     if (par.size == 1) Box(Modifier.weight(1f))
                 }
             }
