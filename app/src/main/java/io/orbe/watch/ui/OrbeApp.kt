@@ -101,11 +101,11 @@ fun OrbeApp(
         forteMin = if (ajustes.batidaForte > 0f) ajustes.batidaForte else Batida.FORTE_MIN,
         aoDetectar = vm::avisarBatida,
     ) { c ->
-        if (c.forca == Forca.FRACA) {
-            if (paginas.currentPage == 0 && historico == null) coroa.tryEmit(if (c.vezes >= 2) -1 else 1)
-        } else {
-            vm.estalo(c.vezes, podeGravar())
-        }
+        vm.batida((if (c.forca == Forca.FORTE) 2 else 0) + (if (c.vezes >= 2) 1 else 0), podeGravar())
+    }
+    // as ações de trocar de orbe (dos toques e das batidas) andam a lista como a coroa
+    LaunchedEffect(vm) {
+        vm.passosLista.collect { passo -> if (paginas.currentPage == 0 && historico == null) coroa.tryEmit(passo) }
     }
 
     // com a sessão aberta a tela não apaga no meio da conversa

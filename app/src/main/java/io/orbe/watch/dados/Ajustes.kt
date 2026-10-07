@@ -27,6 +27,12 @@ enum class AcaoToque(val id: String, val nome: String) {
     HISTORICO("historico", "Histórico"),
     /** segurar para falar: a fala vai enquanto o dedo fica (só no toque segurado) */
     FALAR("falar", "Falar"),
+    /** o orbe seguinte da lista (como a coroa para baixo) */
+    PROXIMO("proximo", "Próximo orbe"),
+    /** o orbe anterior da lista */
+    ANTERIOR("anterior", "Orbe anterior"),
+    /** o raciocínio do agente do orbe passa ao nível seguinte (vale na próxima sessão dele) */
+    RACIOCINIO("raciocinio", "Raciocínio"),
     NADA("nada", "Nada");
 
     companion object {
@@ -37,6 +43,8 @@ enum class AcaoToque(val id: String, val nome: String) {
         val PADRAO_SEGURAR = listOf(FALAR, HISTORICO, NADA, NADA)
         /** as que os toques curtos ciclam (falar só segurando) */
         val CURTAS = entries.filter { it != FALAR }
+        /** toque fraco, dois fracos, estalo, dois estalos */
+        val PADRAO_BATIDAS = listOf(PROXIMO, ANTERIOR, LIVE, ENCERRAR)
     }
 }
 
@@ -108,6 +116,8 @@ data class Ajustes(
     /** a batida fraca mais forte da calibração: o forte fica entre ela e o estalo mais fraco */
     val batidaFracaTopo: Float = 0f,
     val batidaForte: Float = 0f,
+    /** a ação de cada combinação: toque fraco, dois fracos, estalo, dois estalos */
+    val batidasAcoes: List<AcaoToque> = AcaoToque.PADRAO_BATIDAS,
 ) {
     /** A ação de [n] toques curtos (1 a 4). */
     fun toque(n: Int): AcaoToque = toques.getOrNull(n - 1) ?: AcaoToque.NADA
@@ -220,6 +230,7 @@ class Cofre(private val ctx: Context) {
         val batidaFraca = floatPreferencesKey("batida_fraca")
         val batidaForte = floatPreferencesKey("batida_forte")
         val batidaFracaTopo = floatPreferencesKey("batida_fraca_topo")
+        val batidasAcoes = stringPreferencesKey("batidas_acoes")
     }
 
     private fun lerAgentes(s: String?): Map<String, String> =
@@ -294,6 +305,7 @@ class Cofre(private val ctx: Context) {
             batidaFraca = p[K.batidaFraca] ?: d.batidaFraca,
             batidaForte = p[K.batidaForte] ?: d.batidaForte,
             batidaFracaTopo = p[K.batidaFracaTopo] ?: d.batidaFracaTopo,
+            batidasAcoes = p[K.batidasAcoes]?.split(',')?.mapNotNull { AcaoToque.de(it) }?.takeIf { it.size == 4 } ?: d.batidasAcoes,
         )
     }
 
@@ -332,6 +344,7 @@ class Cofre(private val ctx: Context) {
             p[K.batidaFraca] = a.batidaFraca
             p[K.batidaForte] = a.batidaForte
             p[K.batidaFracaTopo] = a.batidaFracaTopo
+            p[K.batidasAcoes] = a.batidasAcoes.joinToString(",") { it.id }
             p[K.sacudidaDentro] = a.sacudidaDentro
             p[K.ordem] = a.ordem.joinToString(",")
             p[K.sair] = a.sair

@@ -420,13 +420,15 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun batidasPadrao() = mudar { it.copy(batidaFraca = 0f, batidaFracaTopo = 0f, batidaForte = 0f) }
 
-    /**
-     * Um comando das batidas (só com o app aberto, no orbe): o estalo abre ou
-     * fecha o live; dois estalos fecham o chat. Trocar de orbe é da lista (a coroa).
-     */
-    fun estalo(vezes: Int, podeGravar: Boolean) {
-        if (vezes >= 2) executar(AcaoToque.ENCERRAR, podeGravar) else executar(AcaoToque.LIVE, podeGravar)
+    /** Passos da lista de orbes pedidos pelas ações (+1 o seguinte, -1 o anterior); o OrbeApp leva à lista, como a coroa. */
+    val passosLista = kotlinx.coroutines.flow.MutableSharedFlow<Int>(extraBufferCapacity = 1)
+
+    /** Um comando das batidas (só com o app aberto): 0 toque fraco, 1 dois fracos, 2 estalo, 3 dois estalos. */
+    fun batida(i: Int, podeGravar: Boolean) {
+        _ajustes.value.batidasAcoes.getOrNull(i)?.let { executar(it, podeGravar) }
     }
+
+    fun proximaBatida(i: Int) = mudar { a -> a.copy(batidasAcoes = proxima(a.batidasAcoes, i + 1, AcaoToque.CURTAS)) }
 
     /** O fora mínimo de sair, da calibração; 0 volta ao padrão. */
     fun calibrarSair(fora: Float) = mudarSinc { it.copy(sairFora = fora) }
@@ -800,6 +802,12 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
             AcaoToque.LIVE -> toqueSessao(live = true, podeGravar)
             AcaoToque.ENCERRAR -> encerrar()
             AcaoToque.HISTORICO -> abrirHistorico()
+            AcaoToque.PROXIMO -> passosLista.tryEmit(1)
+            AcaoToque.ANTERIOR -> passosLista.tryEmit(-1)
+            AcaoToque.RACIOCINIO -> {
+                enviarAgente()
+                ponte.enviar("raciocinio")
+            }
             AcaoToque.FALAR, AcaoToque.NADA -> Unit
         }
     }

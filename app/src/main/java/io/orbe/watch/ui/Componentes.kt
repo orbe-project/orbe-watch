@@ -237,6 +237,18 @@ class MenuEscopo internal constructor(
     fun linha(conteudo: @Composable () -> Unit) = item {
         Box(Modifier.caixa()) { conteudo() }
     }
+
+    /** Linhas em duas colunas, cada uma na sua caixa (a última sozinha, se sobrar). */
+    fun duas(linhas: List<@Composable () -> Unit>) {
+        linhas.chunked(2).forEach { par ->
+            item {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    par.forEach { l -> Box(Modifier.weight(1f).caixa()) { l() } }
+                    if (par.size == 1) Box(Modifier.weight(1f))
+                }
+            }
+        }
+    }
 }
 
 @Composable

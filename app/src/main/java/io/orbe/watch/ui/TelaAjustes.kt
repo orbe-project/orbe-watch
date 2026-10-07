@@ -249,17 +249,13 @@ private fun MenuEscopo.sessao(vm: OrbeViewModel, ajustes: Ajustes, retrato: Retr
         LinhaSwitch("Abrir já no live", ajustes.live) { vm.live(it) }
     }
     grupo("Toques", "Um toque troca a ação.")
-    (1..ajustes.toques.size).forEach { n ->
-        linha {
-            Linha(if (n == 1) "1 toque" else "$n toques", subtitulo = ajustes.toque(n).nome, aoClicar = { vm.proximaAcao(n) })
-        }
-    }
+    duas((1..ajustes.toques.size).map { n ->
+        @Composable { Linha(if (n == 1) "1 toque" else "$n toques", subtitulo = ajustes.toque(n).nome, aoClicar = { vm.proximaAcao(n) }) }
+    })
     grupo("Tocar e segurar", "Os toques antes, o último segurado.")
-    (1..ajustes.segurar.size).forEach { n ->
-        linha {
-            Linha(nomeSegurar(n), subtitulo = ajustes.segura(n).nome, aoClicar = { vm.proximaSegurar(n) })
-        }
-    }
+    duas((1..ajustes.segurar.size).map { n ->
+        @Composable { Linha(nomeSegurar(n), subtitulo = ajustes.segura(n).nome, aoClicar = { vm.proximaSegurar(n) }) }
+    })
 }
 
 /** [n] toques com o último segurado: "Segura", "Toca e segura", "2 toques e segura"... */
@@ -391,10 +387,13 @@ private fun MenuEscopo.gestos(vm: OrbeViewModel, ajustes: Ajustes, pedirMicrofon
             aoClicar = { calibrar(Calibracao.SAIR) },
         )
     }
-    grupo("Batidas", "Com o app aberto. Toque fraco: um desce a lista, dois sobem. Estalo: um abre ou fecha o live, dois fecham o chat.")
+    grupo("Batidas", "Com o app aberto: toque fraco (dedo médio no dedão, ou na mesa) e estalo. Um toque troca a ação.")
     linha {
-        LinhaSwitch("Batidas e estalos", ajustes.batidas, subtitulo = "dedo médio no dedão (ou na mesa) e estalo") { vm.batidas(it) }
+        LinhaSwitch("Batidas e estalos", ajustes.batidas) { vm.batidas(it) }
     }
+    duas(listOf("Toque fraco", "Dois fracos", "Estalo", "Dois estalos").mapIndexed { i, nome ->
+        @Composable { Linha(nome, subtitulo = ajustes.batidasAcoes[i].nome, ativo = ajustes.batidas, aoClicar = { vm.proximaBatida(i) }) }
+    })
     linha {
         Linha(
             "Calibrar o toque fraco",
