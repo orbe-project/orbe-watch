@@ -142,6 +142,9 @@ fun TelaAjustes(
         val ctx = LocalContext.current
         val densidade = LocalDensity.current.density
         LaunchedEffect(largura, aparencia.glitch, aparencia.linhas, tema) {
+            // depois do aquecimento do orbe grande: na abertura as prévias disputavam
+            // a GPU com ele (e o tema ainda chegando refazia tudo)
+            delay(3_000)
             Previas.pedir(ctx, topo, densidade)
             Skin.entries.forEach { Previas.pedir(ctx, cartao(it), densidade) }
         }
