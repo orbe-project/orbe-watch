@@ -420,7 +420,7 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
     /** Passos da lista de orbes pedidos pelas ações (+1 o seguinte, -1 o anterior); o OrbeApp leva à lista, como a coroa. */
     val passosLista = kotlinx.coroutines.flow.MutableSharedFlow<Int>(extraBufferCapacity = 1)
 
-    /** Um comando das batidas (só com o app aberto): 0 toque fraco, 1 dois fracos, 2 estalo, 3 dois estalos. */
+    /** Um comando das batidas (só com o app aberto): 0 a 3 os toques fracos, 4 a 7 os que terminam em estalo ([io.orbe.watch.gesto.Comando.indice]). */
     fun batida(i: Int, podeGravar: Boolean) {
         _ajustes.value.batidasAcoes.getOrNull(i)?.let { executar(it, podeGravar) }
     }

@@ -90,14 +90,14 @@ class MainActivity : ComponentActivity() {
                     if (gesto == Gesto.SAIR) {
                         if (!vm.ajustes.value.batidas) sairPelaSacudida()
                         else {
-                            // o estalo gira o pulso como a sacudida de sair: espera um
-                            // instante e só sai se não houve tranco de batida em volta
+                            // o estalo gira o pulso como a sacudida de sair: espera a janela
+                            // da batida fechar (~270 ms do pico) e só sai se não foi estalo
                             val em = SystemClock.elapsedRealtime()
                             janela.postDelayed({
                                 val t = io.orbe.watch.gesto.TelaTocada.ultimoTrancoMs
                                 if (kotlin.math.abs(t - em) < 500) Log.i(TAG, "sair ignorado: era batida")
                                 else sairPelaSacudida()
-                            }, 200)
+                            }, 350)
                         }
                     }
                 }

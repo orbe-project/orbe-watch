@@ -95,8 +95,8 @@ fun OrbeApp(
     // a calibração da sacudida cobre o menu até salvar ou voltar
     var calibrando by remember { mutableStateOf<Calibracao?>(null) }
 
-    // as batidas, com o app aberto e fora das calibrações: fraca troca de orbe
-    // (como a coroa), o estalo abre e fecha o live, dois fecham o chat
+    // as batidas, com o app aberto e fora das calibrações: 1 a 4 toques fracos,
+    // ou toques que terminam em estalo, cada sequência com a sua ação
     val modelo = remember(ajustes.batidaFracas, ajustes.batidaFortes, ajustes.batidaNada) {
         ModeloBatida.de(Janela.lista(ajustes.batidaFracas), Janela.lista(ajustes.batidaFortes), Janela.lista(ajustes.batidaNada))
     }
@@ -105,7 +105,7 @@ fun OrbeApp(
         modelo = modelo,
         aoDetectar = vm::avisarBatida,
     ) { c ->
-        vm.batida((if (c.forca == Forca.FORTE) 2 else 0) + (if (c.vezes >= 2) 1 else 0), podeGravar())
+        vm.batida(c.indice, podeGravar())
     }
     // as ações de trocar de orbe (dos toques e das batidas) andam a lista como a coroa
     LaunchedEffect(vm) {

@@ -258,6 +258,15 @@ private fun MenuEscopo.sessao(vm: OrbeViewModel, ajustes: Ajustes, retrato: Retr
     })
 }
 
+/** A sequência de batidas [i]: 0 a 3 os toques fracos, 4 a 7 os que terminam em estalo. */
+private fun nomeBatida(i: Int) = when (i) {
+    0 -> "1 toque"
+    in 1..3 -> "${i + 1} toques"
+    4 -> "Estala"
+    5 -> "Toca e estala"
+    else -> "${i - 4} toques e estala"
+}
+
 /** [n] toques com o último segurado: "Segura", "Toca e segura", "2 toques e segura"... */
 private fun nomeSegurar(n: Int) = when (n) {
     1 -> "Segura"
@@ -391,8 +400,12 @@ private fun MenuEscopo.gestos(vm: OrbeViewModel, ajustes: Ajustes, pedirMicrofon
     linha {
         LinhaSwitch("Batidas e estalos", ajustes.batidas) { vm.batidas(it) }
     }
-    duas(listOf("Toque fraco", "Dois fracos", "Estalo", "Dois estalos").mapIndexed { i, nome ->
-        @Composable { Linha(nome, subtitulo = ajustes.batidasAcoes[i].nome, ativo = ajustes.batidas, aoClicar = { vm.proximaBatida(i) }) }
+    duas((0 until 4).map { i ->
+        @Composable { Linha(nomeBatida(i), subtitulo = ajustes.batidasAcoes[i].nome, ativo = ajustes.batidas, aoClicar = { vm.proximaBatida(i) }) }
+    })
+    grupo("Tocar e estalar", "Os toques antes, o último estala no mesmo movimento.")
+    duas((4 until 8).map { i ->
+        @Composable { Linha(nomeBatida(i), subtitulo = ajustes.batidasAcoes[i].nome, ativo = ajustes.batidas, aoClicar = { vm.proximaBatida(i) }) }
     })
     duas(listOf(
         Triple("Calibrar o toque fraco", ajustes.batidaFracas, Calibracao.FRACA),

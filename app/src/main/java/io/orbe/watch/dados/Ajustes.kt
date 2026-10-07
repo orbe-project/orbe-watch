@@ -43,8 +43,8 @@ enum class AcaoToque(val id: String, val nome: String) {
         val PADRAO_SEGURAR = listOf(FALAR, HISTORICO, NADA, NADA)
         /** as que os toques curtos ciclam (falar só segurando) */
         val CURTAS = entries.filter { it != FALAR }
-        /** toque fraco, dois fracos, estalo, dois estalos */
-        val PADRAO_BATIDAS = listOf(PROXIMO, ANTERIOR, LIVE, ENCERRAR)
+        /** 1 a 4 toques fracos; depois estalo, toca e estala, 2 toques e estala, 3 toques e estala */
+        val PADRAO_BATIDAS = listOf(PROXIMO, ANTERIOR, NADA, NADA, LIVE, ENCERRAR, NADA, NADA)
     }
 }
 
@@ -308,7 +308,7 @@ class Cofre(private val ctx: Context) {
             batidaFracas = p[K.batidaFracas] ?: d.batidaFracas,
             batidaFortes = p[K.batidaFortes] ?: d.batidaFortes,
             batidaNada = p[K.batidaNada] ?: d.batidaNada,
-            batidasAcoes = p[K.batidasAcoes]?.split(',')?.mapNotNull { AcaoToque.de(it) }?.takeIf { it.size == 4 } ?: d.batidasAcoes,
+            batidasAcoes = p[K.batidasAcoes]?.split(',')?.mapNotNull { AcaoToque.de(it) }?.takeIf { it.size == 8 } ?: d.batidasAcoes,
         )
     }
 

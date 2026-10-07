@@ -14,15 +14,21 @@ object TelaTocada {
     @Volatile var surdoAte = 0L
     /** a vibração do aviso: até aqui nada conta, mas o comando em curso segue (ele é o que vibrou) */
     @Volatile var vibrandoAte = 0L
-    /** o último candidato a batida (ms desde o boot): o estalo gira o pulso e a sacudida de sair não pode valer nele */
+    /** a última batida reconhecida (ms desde o boot): o estalo gira o pulso e a sacudida de sair não pode valer nela */
     @Volatile var ultimoTrancoMs = 0L
 }
 
 /** A força de uma batida: o toque fraco (dedo médio no dedão, ou a ponta dos dedos na mesa) ou o estalo. */
 enum class Forca { FRACA, FORTE }
 
-/** O que uma ou duas batidas seguidas da mesma força deram. */
-data class Comando(val forca: Forca, val vezes: Int)
+/**
+ * Uma sequência de batidas: [vezes] movimentos (1 a 4); com [forca] FORTE o
+ * último foi o estalo (os anteriores, toques fracos), com FRACA todos foram toques.
+ */
+data class Comando(val forca: Forca, val vezes: Int) {
+    /** a posição na lista das ações: 0 a 3 os toques, 4 a 7 os que terminam em estalo */
+    val indice get() = (if (forca == Forca.FORTE) 4 else 0) + vezes - 1
+}
 
 const val AMOSTRAS = 35                     // ~350 ms a 100 Hz
 private const val ANTES = 8                 // amostras antes do pico na janela
@@ -133,9 +139,10 @@ class ModeloBatida(val fraca: Perfil?, val forte: Perfil?, val nada: List<Janela
  * é o toque fraco, o estalo ou nada. Em [coletando] (a calibração), toda janela
  * sai, sem comando e em qualquer postura.
  *
- * Os comandos: batidas da mesma força dentro de [JUNTAR_MS] somam; a pressão
- * do dedo antes do estalo e o rebote depois dele são do estalo; um terceiro na
- * janela cancela (digitar); com o dedo na tela ou a vibração, nada conta. Vale
+ * Os comandos: toques fracos a menos de [JUNTAR_MS] um do outro somam (até
+ * [MAX_VEZES]); o estalo fecha a sequência na hora; a pressão do dedo antes do
+ * estalo e o rebote depois dele são do estalo; um toque além do máximo cancela
+ * (digitar); com o dedo na tela ou a vibração, nada conta. Vale
  * em qualquer posição do braço: o perfil já separa o gesto do resto.
  */
 class Batida(
@@ -160,6 +167,7 @@ class Batida(
     private var pendente: Forca? = null
     private var vezes = 0
     private var ultimaMs = 0L
+    private var ultimoEstaloMs = 0L
     private val janelas = ArrayList<Janela>()
     private val comandos = ArrayList<Comando>()
     private val registros = ArrayList<String>()
@@ -205,12 +213,17 @@ class Batida(
         if (picoEm < 0) {
             if (e >= gatilho && media < gatilho * QUIETO && ms >= surdoAte) {
                 picoEm = n - 1; picoE = e; picoMs = ms
-                TelaTocada.ultimoTrancoMs = ms
             } else {
                 media += (e - media) * 0.05f
             }
         } else {
             if (e > picoE && n - 1 - picoEm <= 6) { picoEm = n - 1; picoE = e; picoMs = ms }
+            // um pulso bem maior depois do pico (o candidato era resto da vibração ou
+            // tremor): o candidato passa a ser ele, senão a batida de verdade se perde
+            else if (e > picoE * 1.5f && e >= gatilho) {
+                registros += "candidato trocado: %.2f por %.2f".format(picoE, e)
+                picoEm = n - 1; picoE = e; picoMs = ms
+            }
             if (n - 1 - picoEm >= AMOSTRAS - ANTES - 1) {
                 fecharJanela()
                 picoEm = -1
@@ -252,21 +265,23 @@ class Batida(
         val m = modelo ?: return
         val (f, motivo) = m.classificar(j)
         registros += "acel %.1f giro %.1f: %s".format(aMax, gMax, motivo)
-        if (f != null) { janelas += j; contar(picoMs, f) }
+        if (f != null) { janelas += j; TelaTocada.ultimoTrancoMs = picoMs; contar(picoMs, f) }
     }
 
     private fun contar(ms: Long, f: Forca) {
-        // a pressão do dedo antes do estalo e o rebote depois dele são do estalo
-        if (f == Forca.FORTE && pendente == Forca.FRACA && vezes == 1 && ms - ultimaMs <= PRE_ESTALO_MS) {
-            pendente = Forca.FORTE; ultimaMs = ms; return
+        if (f == Forca.FORTE) {
+            // o toque logo antes é a pressão do dedo do próprio estalo
+            if (vezes > 0 && ms - ultimaMs <= PRE_ESTALO_MS) vezes--
+            comandos += Comando(Forca.FORTE, vezes + 1)
+            pendente = null; vezes = 0; ultimoEstaloMs = ms
+            return
         }
-        if (f == Forca.FRACA && pendente == Forca.FORTE && ms - ultimaMs <= PRE_ESTALO_MS) return
-        if (pendente != null && pendente != f) soltar()
-        pendente = f
+        if (ms - ultimoEstaloMs <= PRE_ESTALO_MS) return // o rebote do estalo
+        pendente = Forca.FRACA
         vezes++
         ultimaMs = ms
-        if (vezes > 2) {
-            registros += "terceiro na janela: comando cancelado (rajada)"
+        if (vezes > MAX_VEZES) {
+            registros += "toque além de $MAX_VEZES: comando cancelado (rajada)"
             pendente = null; vezes = 0; surdoAte = ms + SURDO_MS
         }
     }
@@ -293,6 +308,7 @@ class Batida(
         private const val SURDO_MS = 400L
         private const val PRE_ESTALO_MS = 350L
         private const val RAIZ2 = 1.41421f
+        const val MAX_VEZES = 4
         const val JUNTAR_MS = 1100L              // os pares do Davi: 650 a 1090 ms
 
         /** um número só para comparar a força de duas janelas */
