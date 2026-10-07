@@ -147,6 +147,10 @@ internal object Motor {
     private var skinMedida: Skin? = null  // de qual skin é a qualidade em uso
     private var guardado: SharedPreferences? = null
     private var janelaDesde = 0L
+    private var grandeDesde = 0L          // quando o orbe grande apareceu (0 = fora da tela)
+    // os primeiros segundos do orbe grande (o shader carregando, a abertura
+    // crescendo a figura) atrasam quadros que não são de falta de GPU: não contam
+    private const val AQUECIMENTO_NS = 3_000_000_000L
     private var naJanela = 0
     private var atrasados = 0
     private var ruins = 0                 // janelas seguidas com a maioria dos quadros atrasada
@@ -329,7 +333,9 @@ internal object Motor {
         if (livre) umaPrevia()
         // só as janelas com o orbe grande na tela contam para a qualidade dele, e
         // sem prévia no meio: o atraso de um quadro dela não é dele
-        if (grande && previas.isEmpty()) avaliar(agoraNs, passou, intervalo) else janelaDesde = 0L
+        if (!grande) grandeDesde = 0L else if (grandeDesde == 0L) grandeDesde = agoraNs
+        if (grande && previas.isEmpty() && agoraNs - grandeDesde >= AQUECIMENTO_NS) avaliar(agoraNs, passou, intervalo)
+        else janelaDesde = 0L
     }
 
     /** Um quadro da primeira prévia da fila, lido da GPU para um Bitmap. */
@@ -458,7 +464,9 @@ internal object Motor {
 
     // desenhado por elemento, o custo é outro: a qualidade aprendida por pixel não vale.
     // As de imagem passaram a pular as camadas sem desenho no pixel: a aprendida antes também não
+    // O Seraphim ganhou as asas articuladas (2026-10-07): o shader é outro, a de antes não vale
     private fun chave(skin: Skin?) = "qualidade_${skin?.id}" + when {
+        skin == Skin.SERAFIM_GRAVURA || skin == Skin.SERAFIM_POSITIVO -> "_articulado"
         skin?.primitivas == true -> "_prim"
         skin?.imagem == true -> "_caixas"
         else -> ""
