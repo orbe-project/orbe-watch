@@ -130,7 +130,10 @@ class Batida(
                     val f = if (picoMax >= forteMin) Forca.FORTE else Forca.FRACA
                     val anterior = ultimoTrancoMs
                     ultimoTrancoMs = ms
-                    if (pendente == null && ms - anterior < ISOLADO_MS) {
+                    if (calibrando) {
+                        // na calibração só se mede: sem rajada nem comando
+                        medidas += Medida(picoMax, picoGiro, largura, f, floatArrayOf(lx, ly, lz))
+                    } else if (pendente == null && ms - anterior < ISOLADO_MS) {
                         // tranco logo depois de outro sem comando em curso: é rajada (digitar)
                         bloqueadoAte = ms + SURDO_MS
                         descartes += "pico %.1f: rajada (outro tranco %d ms antes)".format(picoMax, ms - anterior)
@@ -204,8 +207,8 @@ class Batida(
         private const val VOLTA_AMOSTRAS = 12    // ~120 ms para voltar ao quieto
         private const val REFRATARIO_MS = 80L    // o rebote do tranco não conta como outra (curto: o estalo vem logo depois da pressão)
         private const val PRE_ESTALO_MS = 350L   // a pressão do dedo antes do estalo
-        private const val ISOLADO_MS = 500L      // sem outro tranco antes disso: o primeiro de um comando
-        private const val SURDO_MS = 600L        // depois de uma rajada, um tempo sem contar
+        private const val ISOLADO_MS = 250L      // outro tranco até aqui antes do primeiro: é rajada (digitar: 125 a 200 ms por tecla)
+        private const val SURDO_MS = 400L        // depois de uma rajada, um tempo sem contar
         const val ELEVACAO_MIN_GRAUS = 15
         private const val SEN_ELEVACAO = 0.2588f  // sen 15°
         const val JUNTAR_MS = 750L               // até aqui, a segunda da mesma força soma (os pares do Davi: 650 a 1090 ms)
