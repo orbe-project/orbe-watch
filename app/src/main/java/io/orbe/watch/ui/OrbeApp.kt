@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import io.orbe.watch.Aparencia
@@ -197,7 +198,13 @@ fun OrbeApp(
     BackHandler(historico != null) { vm.fecharHistorico() }
     // cada abertura do histórico começa do alto
     LaunchedEffect(historico == null) { if (historico != null) listaHistorico.scrollToItem(0) }
-    LaunchedEffect(Unit) { foco.requestFocus() }
+    // a coroa só chega a quem tem o foco: pedir de novo a cada volta ao app (a
+    // activity pausada é retomada, não recriada) e ao fechar o que cobre o orbe
+    LifecycleResumeEffect(Unit) {
+        foco.requestFocus()
+        onPauseOrDispose { }
+    }
+    LaunchedEffect(historico == null, calibrando, paginas.settledPage) { foco.requestFocus() }
     LaunchedEffect(menuPedido.value) {
         val m = menuPedido.value ?: return@LaunchedEffect
         menuPedido.value = null
