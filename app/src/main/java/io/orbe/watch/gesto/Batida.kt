@@ -125,9 +125,12 @@ class Perfil(
             val proximos = formas.indices.map { a ->
                 vizinhos(formas[a], formas.filterIndexed { i, _ -> i != a })
             }.sorted()
-            // o décimo percentil, sem folga: com muitas posições, o mínimo afrouxava demais
+            // o décimo percentil (com muitas posições, o mínimo afrouxava demais), com
+            // folga e um teto: os estalos da calibração saem quase iguais entre si, e
+            // sem teto o limiar ia a 0,90 e recusava estalos de verdade (0,70 a 0,90);
+            // o que separa o estalo do resto é a força, que a faixa já cobra
             val base = proximos[proximos.size / 10]
-            val limiar = base.coerceIn(0.5f, 0.92f)
+            val limiar = (base - 0.08f).coerceIn(0.5f, 0.7f)
             val a = tentativas.map { it.aceleracao }
             val g = tentativas.map { it.giro }
             return Perfil(
