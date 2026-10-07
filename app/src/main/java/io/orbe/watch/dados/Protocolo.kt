@@ -124,8 +124,8 @@ data class Sincronia(
     @SerialName("seguir_pc") val seguirPc: Boolean = true,
     /** a escala de cada orbe, pela skin; null (do PC): segue o [tamanho] */
     val tamanhos: Map<String, Float?> = emptyMap(),
-    /** o glitch de cada orbe, pela skin; null (do PC): segue o [glitch]; ausente (PC antigo): fica o daqui */
-    val glitches: Map<String, Boolean?>? = null,
+    /** o glitch de cada orbe, pela skin; null (do PC): segue o [glitch] */
+    val glitches: Map<String, Boolean?> = emptyMap(),
     // Os de baixo o PC só conhece depois de o relógio mandar os dele: null (do
     // PC) é "não sei", e o relógio fica com o que tem.
     /** a ação de 1, 2, 3 e 4 toques ([AcaoToque]) */

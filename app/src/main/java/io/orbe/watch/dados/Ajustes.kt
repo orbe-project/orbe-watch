@@ -143,8 +143,8 @@ data class Ajustes(
         texto = s.texto, glitch = s.glitch, linhas = s.linhas, tamanho = s.tamanho.coerceIn(TAMANHO_MIN, TAMANHO_MAX), seguirPc = s.seguirPc,
         // o PC manda null no orbe que ainda segue o tamanho comum
         tamanhos = s.tamanhos.mapNotNull { (k, v) -> v?.let { k to it.coerceIn(TAMANHO_MIN, TAMANHO_MAX) } }.toMap(),
-        // o PC manda null no orbe que segue o glitch comum; um PC antigo não manda o mapa
-        glitches = s.glitches?.mapNotNull { (k, v) -> v?.let { k to it } }?.toMap() ?: glitches,
+        // o PC manda null no orbe que segue o glitch comum
+        glitches = s.glitches.mapNotNull { (k, v) -> v?.let { k to it } }.toMap(),
         // o que o PC ainda não conhece (null) fica como está aqui
         toques = s.toques?.let { l -> lista(l, toques, AcaoToque.CURTAS) } ?: toques,
         segurar = s.segurar?.let { l -> lista(l, segurar, AcaoToque.entries) } ?: segurar,
