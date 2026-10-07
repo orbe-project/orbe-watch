@@ -124,7 +124,20 @@ class ModeloBatida(val fraca: Perfil?, val forte: Perfil?, val nada: List<Janela
 
     companion object {
         const val GATILHO_PADRAO = 0.6f
-        fun de(fracas: List<Janela>, fortes: List<Janela>, nada: List<Janela>): ModeloBatida {
+
+        /**
+         * As tentativas sem as que são tremor: força abaixo de um quarto da mediana
+         * (a calibração do estalo pegou 0,4 e 0,8 junto de estalos de 22, e o
+         * perfil passou a aceitar tremor como estalo).
+         */
+        fun semTremor(l: List<Janela>): List<Janela> {
+            if (l.size < 3) return l
+            val mediana = l.map { Batida.forca(it) }.sorted()[l.size / 2]
+            return l.filter { Batida.forca(it) >= mediana / 4f }
+        }
+        fun de(fracasTodas: List<Janela>, fortesTodas: List<Janela>, nada: List<Janela>): ModeloBatida {
+            val fracas = semTremor(fracasTodas)
+            val fortes = semTremor(fortesTodas)
             val forcas = (fracas + fortes).map { it.aceleracao + it.giro }
             val gatilho = if (forcas.isEmpty()) GATILHO_PADRAO else (forcas.min() * 0.7f).coerceIn(0.3f, 3f)
             return ModeloBatida(Perfil.de(fracas), Perfil.de(fortes), nada, gatilho)
@@ -231,7 +244,9 @@ class Batida(
                 media = 0f
             }
         }
-        if (pendente != null && ms - ultimaMs > JUNTAR_MS) soltar()
+        // com um candidato aberto (pico já visto, janela ainda enchendo) o comando
+        // espera: o candidato pode ser o toque seguinte da mesma sequência
+        if (pendente != null && picoEm < 0 && ms - ultimaMs > JUNTAR_MS) soltar()
     }
 
     private fun fecharJanela() {
@@ -309,7 +324,7 @@ class Batida(
         private const val PRE_ESTALO_MS = 350L
         private const val RAIZ2 = 1.41421f
         const val MAX_VEZES = 4
-        const val JUNTAR_MS = 1100L              // os pares do Davi: 650 a 1090 ms
+        const val JUNTAR_MS = 1250L              // os pares do Davi: 650 a 1150 ms (pico a pico)
 
         /** um número só para comparar a força de duas janelas */
         fun forca(j: Janela) = j.aceleracao + j.giro

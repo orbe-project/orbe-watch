@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.orbe.watch.gesto.Batida
 import io.orbe.watch.gesto.Janela
+import io.orbe.watch.gesto.ModeloBatida
 import io.orbe.watch.gesto.Picos
 import io.orbe.watch.gesto.Sacudida
 import io.orbe.watch.gesto.ServicoSacudida
@@ -151,6 +152,12 @@ fun TelaCalibracaoBatida(
             if (janelas.size < TENTATIVAS_BATIDA) {
                 Log.i("OrbeBatida", "calibração $tipo: tentativa acel %.1f giro %.1f".format(g.aceleracao, g.giro))
                 janelas += g
+                // tremor que entrou como tentativa sai, e a tentativa volta a faltar
+                val limpas = ModeloBatida.semTremor(janelas.toList())
+                if (limpas.size < janelas.size) {
+                    Log.i("OrbeBatida", "calibração $tipo: ${janelas.size - limpas.size} tentativas fracas demais descartadas")
+                    janelas.clear(); janelas += limpas
+                }
             }
         }
     }
