@@ -1,6 +1,8 @@
 package io.orbe.watch.ui
 
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.Orientation
+import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
 import androidx.compose.foundation.layout.Spacer
 import androidx.wear.compose.foundation.curvedComposable
 import androidx.compose.ui.draw.alpha
@@ -153,8 +155,8 @@ fun TelaOrbe(
     redonda: Boolean,
     podeGravar: () -> Boolean,
     abrirAjustes: () -> Unit,
-    /** passos da coroa: +1 o orbe seguinte, -1 o anterior */
-    coroa: Flow<Int>,
+    /** o giro da coroa (ou da moldura giratória), cru, como o sistema entrega */
+    coroa: Flow<GiroCoroa>,
     modifier: Modifier = Modifier,
 ) {
     val ajustes by vm.ajustes.collectAsStateWithLifecycle()
@@ -197,8 +199,12 @@ fun TelaOrbe(
             val p = paginas.settledPage
             if (!paginas.isScrollInProgress && skins[p.mod(nSkins)] != aparencia.skin) paginas.scrollToPage(pagina(skins, aparencia.skin, p))
         }
-        LaunchedEffect(paginas) {
-            coroa.collect { passo -> if (!paginas.isScrollInProgress) paginas.animateScrollToPage(paginas.currentPage + passo) }
+        // o encaixe do Wear: na coroa de alta resolução (TicWatch Pro 5, Pixel Watch)
+        // o giro acumula e assenta no orbe mais perto; nos encoders de clique
+        // (molduras giratórias) cada clique é um orbe. Giro rápido passa vários.
+        val encaixe = RotaryScrollableDefaults.snapBehavior(paginas)
+        LaunchedEffect(paginas, encaixe) {
+            coroa.collect { g -> with(encaixe) { performScroll(g.t, g.delta, g.aparelho, Orientation.Vertical) } }
         }
         // assentou noutra skin pelo dedo: ela passa a ser o orbe do relógio
         val ordem by rememberUpdatedState(skins)
@@ -664,3 +670,6 @@ private fun Rotulo(alto: String, pe: String, cor: Color, modifier: Modifier = Mo
         }
     }
 }
+
+/** Um evento da coroa: hora (uptime), pixels de giro e o aparelho que girou. */
+class GiroCoroa(val t: Long, val delta: Float, val aparelho: Int)

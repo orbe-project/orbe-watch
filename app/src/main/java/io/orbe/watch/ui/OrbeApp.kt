@@ -34,8 +34,6 @@ import io.orbe.watch.Aparencia
 import io.orbe.watch.OrbeViewModel
 import io.orbe.watch.dados.Ligacao
 import io.orbe.watch.gesto.Picos
-import kotlin.math.abs
-import kotlin.math.sign
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
@@ -72,9 +70,8 @@ fun OrbeApp(
     var aba by remember { mutableStateOf<Aba?>(null) }
     val escopo = rememberCoroutineScope()
     val foco = remember { FocusRequester() }
-    // a coroa no orbe: um orbe da lista a cada tanto de giro
-    val coroa = remember { MutableSharedFlow<Int>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST) }
-    val giro = remember { floatArrayOf(0f) }
+    // a coroa no orbe: o giro cru vai para a lista dos orbes, que encaixa de orbe em orbe
+    val coroa = remember { MutableSharedFlow<GiroCoroa>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST) }
     // a calibração da sacudida cobre o menu até salvar ou voltar
     var calibrando by remember { mutableStateOf<Calibracao?>(null) }
 
@@ -119,11 +116,7 @@ fun OrbeApp(
                     if (historico != null) {
                         listaHistorico.dispatchRawDelta(d)
                     } else if (paginas.currentPage == 0) {
-                        giro[0] += d
-                        if (abs(giro[0]) >= GIRO_POR_PASSO) {
-                            coroa.tryEmit(giro[0].sign.toInt())
-                            giro[0] = 0f
-                        }
+                        coroa.tryEmit(GiroCoroa(e.uptimeMillis, d, e.inputDeviceId))
                     } else {
                         if (aba != null) lista.dispatchRawDelta(d)
                     }
@@ -216,6 +209,3 @@ fun OrbeApp(
         if (paginas.settledPage == 0) aba = null
     }
 }
-
-/** Pixels de giro da coroa por orbe da lista. */
-private const val GIRO_POR_PASSO = 90f
