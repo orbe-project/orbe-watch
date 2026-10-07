@@ -9,7 +9,7 @@ enum class Forca { FRACA, FORTE }
 data class Comando(val forca: Forca, val vezes: Int)
 
 /** Uma batida detectada: a força e o que se mediu dela (para a calibração e o log). */
-data class Medida(val pico: Float, val giro: Float, val largura: Int)
+data class Medida(val pico: Float, val giro: Float, val largura: Int, val forca: Forca)
 
 /**
  * Batidas do pulso pelo acelerômetro e pelo giroscópio: uma perturbação
@@ -86,8 +86,8 @@ class Batida(
                 bloqueadoAte = ms + REFRATARIO_MS
                 val curto = largura <= LARGURA_MAX && depois < VOLTA_AMOSTRAS
                 if (curto && picoMax >= fracaMin) {
-                    medidas += Medida(picoMax, picoGiro, largura)
                     val f = if (picoMax >= forteMin) Forca.FORTE else Forca.FRACA
+                    medidas += Medida(picoMax, picoGiro, largura, f)
                     contar(ms, f)
                 }
                 ruido = 0f
@@ -128,7 +128,7 @@ class Batida(
         private const val LARGURA_MAX = 4        // amostras acima da metade do pico (~40 ms)
         private const val VOLTA_AMOSTRAS = 12    // ~120 ms para voltar ao quieto
         private const val REFRATARIO_MS = 120L   // o rebote do tranco não conta como outra
-        const val JUNTAR_MS = 450L               // até aqui, a segunda da mesma força soma
+        const val JUNTAR_MS = 750L               // até aqui, a segunda da mesma força soma (os pares do Davi: 650 a 1090 ms)
     }
 }
 

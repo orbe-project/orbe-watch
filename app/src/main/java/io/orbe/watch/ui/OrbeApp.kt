@@ -99,6 +99,7 @@ fun OrbeApp(
         ligado = ajustes.batidas && calibrando == null,
         fracaMin = if (ajustes.batidaFraca > 0f) ajustes.batidaFraca else Batida.FRACA_MIN,
         forteMin = if (ajustes.batidaForte > 0f) ajustes.batidaForte else Batida.FORTE_MIN,
+        aoDetectar = vm::avisarBatida,
     ) { c ->
         if (c.forca == Forca.FRACA) {
             if (paginas.currentPage == 0 && historico == null) coroa.tryEmit(if (c.vezes >= 2) -1 else 1)
@@ -271,10 +272,15 @@ private const val GIRO_POR_PASSO = 90f
  * mais rápido enquanto o app está aberto e [ligado]; cada comando vai a [aoComando].
  */
 @Composable
-private fun BatidasNoPulso(ligado: Boolean, fracaMin: Float, forteMin: Float, aoComando: (Comando) -> Unit) {
+private fun BatidasNoPulso(
+    ligado: Boolean, fracaMin: Float, forteMin: Float,
+    aoDetectar: (forte: Boolean) -> Unit, aoComando: (Comando) -> Unit,
+) {
     val ctx = LocalContext.current
     val acao = remember { arrayOf(aoComando) }
     acao[0] = aoComando
+    val aviso = remember { arrayOf(aoDetectar) }
+    aviso[0] = aoDetectar
     val dono = LocalLifecycleOwner.current
     DisposableEffect(ligado, fracaMin, forteMin, dono) {
         if (!ligado) return@DisposableEffect onDispose { }
@@ -287,7 +293,10 @@ private fun BatidasNoPulso(ligado: Boolean, fracaMin: Float, forteMin: Float, ao
                 when (event.sensor.type) {
                     Sensor.TYPE_ACCELEROMETER -> {
                         batida.acel(event.timestamp / 1_000_000, x, y, z)
-                        for (m in batida.tirarMedidas()) Log.i("OrbeBatida", "pico %.1f giro %.1f largura %d".format(m.pico, m.giro, m.largura))
+                        for (m in batida.tirarMedidas()) {
+                            Log.i("OrbeBatida", "pico %.1f giro %.1f largura %d %s".format(m.pico, m.giro, m.largura, m.forca))
+                            principal.post { aviso[0](m.forca == Forca.FORTE) }
+                        }
                         for (c in batida.tirarComandos()) {
                             Log.i("OrbeBatida", "comando ${c.forca} x${c.vezes}")
                             principal.post { acao[0](c) }
