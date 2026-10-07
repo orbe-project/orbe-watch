@@ -114,6 +114,8 @@ fun TelaCalibracaoSair(
 fun TelaCalibracaoBatida(
     forca: Forca,
     emUso: String,
+    /** o pico mínimo de uma tentativa (no estalo, acima da fraca mais forte) */
+    minimo: Float,
     redonda: Boolean,
     salvar: (List<Float>, List<FloatArray>) -> Unit,
     padrao: () -> Unit,
@@ -122,15 +124,25 @@ fun TelaCalibracaoBatida(
     val gravidades = remember { mutableStateListOf<FloatArray>() }
     // na calibração tudo que é tranco curto conta, de qualquer força
     val batida = remember { Batida(fracaMin = 0.35f, forteMin = Float.MAX_VALUE, calibrando = true) }
+    // os trancos que chegam juntos (a pressão do dedo e o estalo, o rebote) são
+    // uma tentativa só: vale o maior pico do grupo, fechado 500 ms depois do último
+    val grupo = remember { floatArrayOf(0f, 0f) }   // maior pico, instante do último tranco
     SensoresBatida(batida) {
+        val agora = android.os.SystemClock.elapsedRealtime().toFloat()
         for (m in batida.tirarMedidas()) {
             Log.i("OrbeBatida", "calibração ${forca.name}: pico ${um(m.pico)} giro ${um(m.giro)} largura ${m.largura}")
-            if (picos.size < TENTATIVAS_BATIDA) {
-                picos += m.pico
-                gravidades += m.gravidade
-            }
+            if (m.pico > grupo[0]) grupo[0] = m.pico
+            grupo[1] = agora
         }
         batida.tirarComandos()
+        if (grupo[0] > 0f && agora - grupo[1] > 500f) {
+            val pico = grupo[0]
+            grupo[0] = 0f
+            if (pico >= minimo && picos.size < TENTATIVAS_BATIDA) {
+                Log.i("OrbeBatida", "calibração ${forca.name}: tentativa ${um(pico)}")
+                picos += pico
+            }
+        }
     }
     val fraca = forca == Forca.FRACA
     val pronta = picos.size >= TENTATIVAS_BATIDA

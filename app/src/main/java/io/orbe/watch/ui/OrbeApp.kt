@@ -214,6 +214,8 @@ fun OrbeApp(
                     forca,
                     emUso = if (forca == Forca.FRACA) (if (ajustes.batidaFraca > 0f) "%.1f m/s²".format(ajustes.batidaFraca) else "o padrão")
                     else (if (ajustes.batidaForte > 0f) "%.1f m/s²".format(ajustes.batidaForte) else "o padrão"),
+                    minimo = if (forca == Forca.FRACA) 0.5f
+                    else if (ajustes.batidaFracaTopo > 0f) ajustes.batidaFracaTopo * 1.1f else 1.5f,
                     redonda,
                     salvar = { p, _ ->
                         if (forca == Forca.FRACA) vm.calibrarFraca(p) else vm.calibrarForte(p)
