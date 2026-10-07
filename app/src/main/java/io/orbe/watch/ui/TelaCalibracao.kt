@@ -29,12 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.offset
 import io.orbe.watch.gesto.Batida
 import io.orbe.watch.gesto.Janela
 import io.orbe.watch.gesto.ModeloBatida
@@ -73,11 +67,11 @@ fun TelaCalibracao(
     }
     val proposta = if (tentativas.size >= TENTATIVAS) limiares(tentativas) else null
     Moldura(
-        "Calibrar o abrir",
+        "Calibrar o abrir", redonda,
         aviso = if (proposta != null) "Fora ${um(proposta.fora)} · dentro ${um(proposta.dentro)} rad/s"
-        else "Pulso parado, depois uma sacudida para fora e de volta.",
-        feitas = tentativas.size, meta = TENTATIVAS, contagem = "${tentativas.size}", rotulo = "de $TENTATIVAS",
-        aoPadrao = padrao,
+        else "Pulso parado, depois uma sacudida para fora e de volta. Tentativa ${tentativas.size + 1} de $TENTATIVAS.",
+        tentativas = tentativas.map { "fora ${um(it.fora)} · dentro ${um(it.dentro)}" },
+        padrao = "fora ${um(Sacudida.FORA_MIN)} · dentro ${um(Sacudida.DENTRO_MIN)}", aoPadrao = padrao,
         pronta = proposta != null, refazer = { tentativas.clear() }, salvar = { proposta?.let(salvar) },
         emUso = "fora ${um(emUso.fora)} · dentro ${um(emUso.dentro)}",
     )
@@ -105,11 +99,11 @@ fun TelaCalibracaoSair(
     }
     val proposta = if (foras.size >= TENTATIVAS) limiarSair(foras) else null
     Moldura(
-        "Calibrar o sair",
+        "Calibrar o sair", redonda,
         aviso = if (proposta != null) "Fora ${um(proposta)} rad/s"
-        else "Pulso parado, depois uma sacudida só para fora.",
-        feitas = foras.size, meta = TENTATIVAS, contagem = "${foras.size}", rotulo = "de $TENTATIVAS",
-        aoPadrao = padrao,
+        else "Pulso parado, depois uma sacudida só para fora. Tentativa ${foras.size + 1} de $TENTATIVAS.",
+        tentativas = foras.map { "fora ${um(it)}" },
+        padrao = "fora ${um(Sacudida.FORA_MIN)}", aoPadrao = padrao,
         pronta = proposta != null, refazer = { foras.clear() }, salvar = { proposta?.let(salvar) },
         emUso = if (emUso > 0f) "fora ${um(emUso)}" else "o padrão, fora ${um(Sacudida.FORA_MIN)}",
     )
@@ -174,90 +168,77 @@ fun TelaCalibracaoBatida(
         else -> "O que não é batida"
     }
     val aviso = when {
-        nada && !pronta -> "Digite, toque a tela, mexa o braço como sempre."
+        nada && !pronta -> "Digite, toque a tela, mexa o braço como sempre. Gravando: $restante s."
         nada -> "${janelas.size} movimentos guardados para recusar."
         pronta -> "Pronto: ${janelas.size} tentativas."
-        tipo == Calibracao.FRACA -> "Um toque do dedo médio no dedão. ${posicao(janelas.size)}"
-        else -> "Um estalo. ${posicao(janelas.size)}"
+        tipo == Calibracao.FRACA -> "Um toque do dedo médio no dedão. ${posicao(janelas.size)} Tentativa ${janelas.size + 1} de $TENTATIVAS_BATIDA."
+        else -> "Um estalo. ${posicao(janelas.size)} Tentativa ${janelas.size + 1} de $TENTATIVAS_BATIDA."
     }
     Moldura(
-        titulo,
+        titulo, redonda,
         aviso = aviso,
-        feitas = if (nada) SEGUNDOS_NADA - restante else janelas.size,
-        meta = if (nada) SEGUNDOS_NADA else TENTATIVAS_BATIDA,
-        contagem = if (nada && !pronta) "$restante s" else "${janelas.size}",
-        rotulo = if (nada) "gravando" else "de $TENTATIVAS_BATIDA",
-        grafico = { m -> GraficoPerfil(janelas.toList(), m) },
-        aoPadrao = padrao,
+        // as tentativas estão no gráfico: a lista de números não diz mais nada
+        tentativas = emptyList(),
+        grafico = { GraficoPerfil(janelas.toList(), if (nada || pronta) null else posicaoCurta(janelas.size)) },
+        amostras = if (nada) null else Amostras(janelas.size, TENTATIVAS_BATIDA, POR_POSICAO),
+        padrao = "apagar as três calibrações", aoPadrao = padrao,
         pronta = pronta, refazer = { janelas.clear(); tempos[1] = 0L; restante = if (nada) SEGUNDOS_NADA else 0 },
         salvar = { salvar(janelas.toList()) },
         emUso = emUso,
     )
 }
 
-/**
- * A tela das calibrações, feita para o mostrador redondo e em vidro líquido: o
- * anel de progresso na borda (um gomo por tentativa), o gráfico do perfil (nas
- * batidas) concêntrico com a tela, a lente no centro com a contagem, o aviso
- * numa placa de vidro embaixo dela e os botões no pé, onde a corda do círculo
- * ainda é larga. Sem rolagem: tudo cabe no círculo.
- */
+/** A tela das calibrações, sobre o mesmo fundo do menu. */
 @Composable
 private fun Moldura(
     titulo: String,
+    redonda: Boolean,
     aviso: String,
-    feitas: Int,
-    meta: Int,
-    contagem: String,
-    rotulo: String,
+    tentativas: List<String>,
+    padrao: String,
     aoPadrao: () -> Unit,
     pronta: Boolean,
     refazer: () -> Unit,
     salvar: () -> Unit,
     emUso: String,
-    grafico: (@Composable (Modifier) -> Unit)? = null,
+    grafico: (@Composable () -> Unit)? = null,
+    amostras: Amostras? = null,
 ) {
-    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
         FundoVidro()
-        val lado = minOf(maxWidth, maxHeight)
-        AnelProgresso(feitas, meta, Modifier.size(lado))
-        grafico?.invoke(Modifier.size(lado * 0.80f))
-        Texto(
-            titulo, Estilo.grupo,
-            Modifier.align(Alignment.TopCenter).padding(top = lado * 0.10f).width(lado * 0.58f),
-            alinhar = TextAlign.Center, linhas = 1,
-        )
-        // a lente: a contagem no centro exato da tela
+        // as barras das amostras na borda, paradas enquanto o resto rola
+        amostras?.let { AnelAmostras(it, Modifier.fillMaxSize()) }
+        val margem = maxWidth * (if (redonda) 0.14f else 0.05f)
         Column(
-            Modifier.offset(y = -lado * 0.04f).size(lado * 0.30f).vidro(CircleShape),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Texto(contagem, Estilo.grupo.copy(fontSize = 17.sp), alinhar = TextAlign.Center, linhas = 1)
-            Texto(if (pronta) "pronto" else rotulo, Estilo.mono, cor = Estilo.texto.alfa(0.6f), linhas = 1)
-        }
-        Box(
-            Modifier.offset(y = lado * 0.20f).width(lado * 0.66f)
-                .vidro(RoundedCornerShape(14.dp))
-                .padding(horizontal = 8.dp, vertical = 5.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Texto(aviso, Estilo.subtitulo, alinhar = TextAlign.Center, linhas = 4)
-        }
-        Column(
-            Modifier.align(Alignment.BottomCenter).padding(bottom = lado * 0.07f).width(lado * 0.62f),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = margem),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (pronta) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    BotaoVidro("Refazer", Modifier.weight(1f), aoClicar = refazer)
-                    BotaoVidro("Salvar", Modifier.weight(1f), destaque = true, aoClicar = salvar)
-                }
-            } else {
-                BotaoVidro("Padrão", aoClicar = aoPadrao)
+            Vao(if (redonda) 30.dp else 12.dp)
+            Texto(titulo, Estilo.grupo, alinhar = TextAlign.Center)
+            Vao(8.dp)
+            Texto(aviso, Estilo.subtitulo, alinhar = TextAlign.Center)
+            Vao(10.dp)
+            if (grafico != null) {
+                grafico()
+                Vao(8.dp)
             }
-            Vao(3.dp)
-            Texto("em uso: $emUso", Estilo.mono, cor = Estilo.texto.alfa(0.55f), alinhar = TextAlign.Center, linhas = 1)
+            Column(Modifier.caixa()) {
+                tentativas.forEachIndexed { i, t ->
+                    Linha("Tentativa ${i + 1}", subtitulo = t)
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(Estilo.texto.alfa(0.08f)))
+                }
+                Linha("Padrão", subtitulo = padrao, aoClicar = aoPadrao)
+            }
+            if (pronta) {
+                Vao(10.dp)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Botao("Refazer", Modifier.weight(1f), aoClicar = refazer)
+                    Botao("Salvar", Modifier.weight(1f), destaque = true, aoClicar = salvar)
+                }
+            }
+            Vao(8.dp)
+            Texto("Em uso: $emUso", Estilo.mono, cor = Estilo.texto.alfa(0.6f), alinhar = TextAlign.Center)
+            Vao(if (redonda) 40.dp else 16.dp)
         }
     }
 }
@@ -341,8 +322,49 @@ private fun um(v: Float) = "%.1f".format(v).replace('.', ',')
 private const val TENTATIVAS = 3
 private const val TENTATIVAS_BATIDA = 20
 
+private const val POR_POSICAO = 5
+
+/** A posição em poucas palavras, para o texto curvo do gráfico. */
+private fun posicaoCurta(feitas: Int) = "posição ${minOf(feitas / POR_POSICAO, 3) + 1} de 4 · " + when (feitas / POR_POSICAO) {
+    0 -> "braço erguido"
+    1 -> "braço à frente"
+    2 -> "braço solto"
+    else -> "pulso virado"
+}
+
+/** As amostras feitas de [meta], em grupos de [porGrupo] (uma posição do braço cada). */
+class Amostras(val feitas: Int, val meta: Int, val porGrupo: Int)
+
+/**
+ * As barras das amostras na borda da tela: uma por tentativa, finas, as feitas
+ * no accent e as que faltam quase apagadas; um vão maior entre os grupos marca
+ * cada posição do braço.
+ */
+@Composable
+private fun AnelAmostras(a: Amostras, modifier: Modifier) {
+    val accent = Estilo.accent
+    val texto = Estilo.texto
+    androidx.compose.foundation.Canvas(modifier) {
+        val raio = minOf(size.width, size.height) / 2 - 4.dp.toPx()
+        val grupos = (a.meta + a.porGrupo - 1) / a.porGrupo
+        val vaoGrupo = 6f
+        val vao = 1.6f
+        val porGrau = (360f - grupos * vaoGrupo) / a.meta
+        val lado = androidx.compose.ui.geometry.Size(raio * 2, raio * 2)
+        val topo = androidx.compose.ui.geometry.Offset(center.x - raio, center.y - raio)
+        for (k in 0 until a.meta) {
+            val ini = -90f + vaoGrupo / 2 + (k / a.porGrupo) * vaoGrupo + k * porGrau + vao / 2
+            drawArc(
+                if (k < a.feitas) accent.alfa(0.75f) else texto.alfa(0.10f),
+                ini, porGrau - vao, false, topo, lado,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(2.dp.toPx()),
+            )
+        }
+    }
+}
+
 /** A posição do braço pedida a cada cinco tentativas: o perfil guarda os exemplos de todas. */
-private fun posicao(feitas: Int) = when (feitas / 5) {
+private fun posicao(feitas: Int) = when (feitas / POR_POSICAO) {
     0 -> "Braço erguido, tela para você."
     1 -> "Braço na horizontal, à frente."
     2 -> "Braço solto, ao lado do corpo."
