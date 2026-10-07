@@ -18,7 +18,7 @@ enum class Forca { FRACA, FORTE }
 data class Comando(val forca: Forca, val vezes: Int)
 
 /** Uma batida detectada: a força e o que se mediu dela (para a calibração e o log). */
-data class Medida(val pico: Float, val giro: Float, val largura: Int, val forca: Forca)
+data class Medida(val pico: Float, val giro: Float, val largura: Int, val forca: Forca, val gravidade: FloatArray)
 
 /**
  * Batidas do pulso pelo acelerômetro e pelo giroscópio: uma perturbação
@@ -36,6 +36,11 @@ class Batida(
     var fracaMin: Float = FRACA_MIN,
     /** a partir deste pico, forte (entre a fraca mais forte e o estalo mais fraco da calibração) */
     var forteMin: Float = FORTE_MIN,
+    /**
+     * A postura da calibração (a direção da gravidade no relógio, com o braço
+     * erguido): a batida só conta a até [POSTURA_GRAUS] dela. Null: qualquer postura.
+     */
+    var postura: FloatArray? = null,
 ) {
     // a parte lenta da aceleração (filtro de primeira ordem): o que sobra é o tranco
     private var lx = 0f
@@ -101,7 +106,7 @@ class Batida(
                 emPico = false
                 bloqueadoAte = ms + REFRATARIO_MS
                 val curto = largura <= LARGURA_MAX && depois < VOLTA_AMOSTRAS
-                if (curto && picoMax >= fracaMin) {
+                if (curto && picoMax >= fracaMin && naPostura()) {
                     val f = if (picoMax >= forteMin) Forca.FORTE else Forca.FRACA
                     val anterior = ultimoTrancoMs
                     ultimoTrancoMs = ms
@@ -109,7 +114,7 @@ class Batida(
                         // tranco logo depois de outro sem comando em curso: é rajada (digitar)
                         bloqueadoAte = ms + SURDO_MS
                     } else {
-                        medidas += Medida(picoMax, picoGiro, largura, f)
+                        medidas += Medida(picoMax, picoGiro, largura, f, floatArrayOf(lx, ly, lz))
                         contar(ms, f)
                     }
                 }
@@ -118,6 +123,14 @@ class Batida(
         }
         // a espera do segundo terminou: sai o comando
         if (pendente != null && ms - ultimaMs > JUNTAR_MS) soltar()
+    }
+
+    /** O relógio na postura da calibração (o braço acima da horizontal, como nas tentativas). */
+    private fun naPostura(): Boolean {
+        val p = postura ?: return true
+        val n = sqrt(lx * lx + ly * ly + lz * lz) * sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2])
+        if (n < 1e-3f) return true
+        return (lx * p[0] + ly * p[1] + lz * p[2]) / n >= COS_POSTURA
     }
 
     private fun contar(ms: Long, f: Forca) {
@@ -158,6 +171,7 @@ class Batida(
         private const val REFRATARIO_MS = 120L   // o rebote do tranco não conta como outra
         private const val ISOLADO_MS = 500L      // sem outro tranco antes disso: o primeiro de um comando
         private const val SURDO_MS = 600L        // depois de uma rajada, um tempo sem contar
+        private const val COS_POSTURA = 0.643f   // cos 50°: o quanto o braço pode fugir da postura da calibração
         const val JUNTAR_MS = 750L               // até aqui, a segunda da mesma força soma (os pares do Davi: 650 a 1090 ms)
     }
 }

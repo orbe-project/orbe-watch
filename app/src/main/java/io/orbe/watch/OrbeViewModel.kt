@@ -404,21 +404,33 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
     fun batidas(v: Boolean) = mudar { it.copy(batidas = v) }
 
     /** Calibração da batida fraca: os picos das tentativas. Refaz o forte se ele já foi calibrado. */
-    fun calibrarFraca(picos: List<Float>) = mudar { a ->
+    fun calibrarFraca(picos: List<Float>, gravidades: List<FloatArray>) = mudar { a ->
         val (fraca, _) = limiaresBatida(picos, emptyList())
         val topo = picos.max()
         val forte = if (a.batidaForte > 0f && a.batidaFracaTopo > 0f) a.batidaForte else 0f
-        a.copy(batidaFraca = fraca, batidaFracaTopo = topo, batidaForte = forte)
+        a.copy(batidaFraca = fraca, batidaFracaTopo = topo, batidaForte = forte, batidaPostura = postura(a.batidaPostura, gravidades))
+    }
+
+    /** A postura média das tentativas, somada à que já havia (a outra calibração). */
+    private fun postura(antes: List<Float>, g: List<FloatArray>): List<Float> {
+        if (g.isEmpty()) return antes
+        val soma = FloatArray(3)
+        for (v in g) {
+            val n = kotlin.math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).coerceAtLeast(1e-3f)
+            for (i in 0..2) soma[i] += v[i] / n
+        }
+        if (antes.size == 3) for (i in 0..2) soma[i] += antes[i] * g.size
+        return soma.toList()
     }
 
     /** Calibração do estalo: os picos das tentativas; o limiar fica entre ele e a fraca mais forte. */
-    fun calibrarForte(picos: List<Float>) = mudar { a ->
+    fun calibrarForte(picos: List<Float>, gravidades: List<FloatArray>) = mudar { a ->
         val fracas = if (a.batidaFracaTopo > 0f) listOf(a.batidaFraca / io.orbe.watch.gesto.MARGEM, a.batidaFracaTopo) else emptyList()
         val (_, forte) = limiaresBatida(fracas, picos)
-        a.copy(batidaForte = forte)
+        a.copy(batidaForte = forte, batidaPostura = postura(a.batidaPostura, gravidades))
     }
 
-    fun batidasPadrao() = mudar { it.copy(batidaFraca = 0f, batidaFracaTopo = 0f, batidaForte = 0f) }
+    fun batidasPadrao() = mudar { it.copy(batidaFraca = 0f, batidaFracaTopo = 0f, batidaForte = 0f, batidaPostura = emptyList()) }
 
     /** Passos da lista de orbes pedidos pelas ações (+1 o seguinte, -1 o anterior); o OrbeApp leva à lista, como a coroa. */
     val passosLista = kotlinx.coroutines.flow.MutableSharedFlow<Int>(extraBufferCapacity = 1)

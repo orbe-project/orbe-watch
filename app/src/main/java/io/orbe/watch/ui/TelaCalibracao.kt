@@ -115,16 +115,20 @@ fun TelaCalibracaoBatida(
     forca: Forca,
     emUso: String,
     redonda: Boolean,
-    salvar: (List<Float>) -> Unit,
+    salvar: (List<Float>, List<FloatArray>) -> Unit,
     padrao: () -> Unit,
 ) {
     val picos = remember { mutableStateListOf<Float>() }
+    val gravidades = remember { mutableStateListOf<FloatArray>() }
     // na calibração tudo que é tranco curto conta, de qualquer força
     val batida = remember { Batida(fracaMin = 0.8f, forteMin = Float.MAX_VALUE) }
     SensoresBatida(batida) {
         for (m in batida.tirarMedidas()) {
             Log.i("OrbeBatida", "calibração ${forca.name}: pico ${um(m.pico)} giro ${um(m.giro)} largura ${m.largura}")
-            if (picos.size < TENTATIVAS_BATIDA) picos += m.pico
+            if (picos.size < TENTATIVAS_BATIDA) {
+                picos += m.pico
+                gravidades += m.gravidade
+            }
         }
         batida.tirarComandos()
     }
@@ -138,7 +142,7 @@ fun TelaCalibracaoBatida(
         tentativas = picos.map { "pico ${um(it)} m/s²" },
         padrao = if (fraca) "fraca a partir de ${um(Batida.FRACA_MIN)}" else "forte a partir de ${um(Batida.FORTE_MIN)}",
         aoPadrao = padrao,
-        pronta = pronta, refazer = { picos.clear() }, salvar = { salvar(picos.toList()) },
+        pronta = pronta, refazer = { picos.clear(); gravidades.clear() }, salvar = { salvar(picos.toList(), gravidades.toList()) },
         emUso = emUso,
     )
 }

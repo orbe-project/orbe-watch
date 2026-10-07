@@ -99,6 +99,7 @@ fun OrbeApp(
         ligado = ajustes.batidas && calibrando == null,
         fracaMin = if (ajustes.batidaFraca > 0f) ajustes.batidaFraca else Batida.FRACA_MIN,
         forteMin = if (ajustes.batidaForte > 0f) ajustes.batidaForte else Batida.FORTE_MIN,
+        postura = ajustes.batidaPostura.takeIf { it.size == 3 }?.toFloatArray(),
         aoDetectar = vm::avisarBatida,
     ) { c ->
         vm.batida((if (c.forca == Forca.FORTE) 2 else 0) + (if (c.vezes >= 2) 1 else 0), podeGravar())
@@ -215,8 +216,8 @@ fun OrbeApp(
                     emUso = if (forca == Forca.FRACA) (if (ajustes.batidaFraca > 0f) "%.1f m/s²".format(ajustes.batidaFraca) else "o padrão")
                     else (if (ajustes.batidaForte > 0f) "%.1f m/s²".format(ajustes.batidaForte) else "o padrão"),
                     redonda,
-                    salvar = {
-                        if (forca == Forca.FRACA) vm.calibrarFraca(it) else vm.calibrarForte(it)
+                    salvar = { p, g ->
+                        if (forca == Forca.FRACA) vm.calibrarFraca(p, g) else vm.calibrarForte(p, g)
                         calibrando = null
                     },
                     padrao = {
@@ -273,7 +274,7 @@ private const val GIRO_POR_PASSO = 90f
  */
 @Composable
 private fun BatidasNoPulso(
-    ligado: Boolean, fracaMin: Float, forteMin: Float,
+    ligado: Boolean, fracaMin: Float, forteMin: Float, postura: FloatArray?,
     aoDetectar: (forte: Boolean) -> Unit, aoComando: (Comando) -> Unit,
 ) {
     val ctx = LocalContext.current
@@ -282,9 +283,9 @@ private fun BatidasNoPulso(
     val aviso = remember { arrayOf(aoDetectar) }
     aviso[0] = aoDetectar
     val dono = LocalLifecycleOwner.current
-    DisposableEffect(ligado, fracaMin, forteMin, dono) {
+    DisposableEffect(ligado, fracaMin, forteMin, postura?.toList(), dono) {
         if (!ligado) return@DisposableEffect onDispose { }
-        val batida = Batida(fracaMin, forteMin)
+        val batida = Batida(fracaMin, forteMin, postura)
         val principal = Handler(Looper.getMainLooper())
         val sensores = ctx.getSystemService(SensorManager::class.java)
         val ouvinte = object : SensorEventListener {
@@ -294,7 +295,8 @@ private fun BatidasNoPulso(
                     Sensor.TYPE_ACCELEROMETER -> {
                         batida.acel(event.timestamp / 1_000_000, x, y, z)
                         for (m in batida.tirarMedidas()) {
-                            Log.i("OrbeBatida", "pico %.1f giro %.1f largura %d %s".format(m.pico, m.giro, m.largura, m.forca))
+                            Log.i("OrbeBatida", "pico %.1f giro %.1f largura %d %s gravidade %.1f %.1f %.1f".format(
+                                m.pico, m.giro, m.largura, m.forca, m.gravidade[0], m.gravidade[1], m.gravidade[2]))
                             principal.post { aviso[0](m.forca == Forca.FORTE) }
                         }
                         for (c in batida.tirarComandos()) {
