@@ -12,7 +12,11 @@ import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
 import android.view.WindowManager
+import android.view.InputDevice
+import android.view.MotionEvent
+import android.view.ViewConfiguration
 import androidx.activity.ComponentActivity
+import androidx.core.view.ViewConfigurationCompat
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -26,8 +30,11 @@ import io.orbe.watch.gesto.Sacudida
 import io.orbe.watch.gesto.ServicoSacudida
 import io.orbe.watch.gl.Motor
 import io.orbe.watch.ui.Campo
+import io.orbe.watch.ui.GiroCoroa
 import io.orbe.watch.ui.OrbeApp
 import kotlin.math.sqrt
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -147,6 +154,7 @@ class MainActivity : ComponentActivity() {
                 pedirMicrofone = { permissao.launch(Manifest.permission.RECORD_AUDIO) },
                 editar = ::editar,
                 menuPedido = menuPedido,
+                coroa = coroa,
             )
         }
         // os sensores do sair só com o orbe na frente e a chave ligada
@@ -159,6 +167,24 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /**
+     * A coroa direto da janela, antes das Views: no Compose o giro só chega a quem
+     * tem o foco, e o VerticalPager do Wear e a superfície GL o tiram do OrbeApp
+     * quando o carrossel troca de página (medido no TicWatch Pro 5).
+     */
+    private val coroa = MutableSharedFlow<GiroCoroa>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    override fun dispatchGenericMotionEvent(ev: MotionEvent): Boolean {
+        if (ev.action == MotionEvent.ACTION_SCROLL && ev.isFromSource(InputDevice.SOURCE_ROTARY_ENCODER)) {
+            // os mesmos pixels que o Compose dá em verticalScrollPixels
+            val px = -ev.getAxisValue(MotionEvent.AXIS_SCROLL) *
+                ViewConfigurationCompat.getScaledVerticalScrollFactor(ViewConfiguration.get(this), this)
+            coroa.tryEmit(GiroCoroa(ev.eventTime, px, ev.deviceId))
+            return true
+        }
+        return super.dispatchGenericMotionEvent(ev)
     }
 
     override fun onNewIntent(intent: Intent) {
