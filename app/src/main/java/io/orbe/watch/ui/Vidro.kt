@@ -48,18 +48,18 @@ fun Modifier.vidro(forma: Shape, tinta: Color? = null, apertado: Boolean = false
             val corpo = if (base != null) {
                 Brush.verticalGradient(listOf(base.alfa(0.62f + 0.12f * luz), base.alfa(0.42f + 0.12f * luz)))
             } else {
-                Brush.verticalGradient(listOf(Color.White.alfa(0.085f + 0.05f * luz), Color.White.alfa(0.025f + 0.04f * luz)))
+                Brush.verticalGradient(listOf(Color.White.alfa(0.03f + 0.04f * luz), Color.White.alfa(0.005f + 0.03f * luz)))
             }
             // o reflexo largo do alto, cortado na metade de cima
             val reflexo = Brush.verticalGradient(
-                0f to Color.White.alfa(if (base != null) 0.20f else 0.07f), 0.5f to Color.Transparent,
+                0f to Color.White.alfa(if (base != null) 0.16f else 0.035f), 0.35f to Color.Transparent,
             )
             // a espessura: escurece por dentro junto à borda de baixo
-            val fundo = Brush.verticalGradient(0.6f to Color.Transparent, 1f to Color.Black.alfa(0.22f))
+            val fundo = Brush.verticalGradient(0.6f to Color.Transparent, 1f to Color.Black.alfa(0.28f))
             // o fio da borda: aceso em cima, apagado no meio, um resto embaixo
             val borda = Brush.verticalGradient(
-                0f to Color.White.alfa(0.42f), 0.35f to Color.White.alfa(0.08f),
-                0.8f to Color.White.alfa(0.03f), 1f to Color.White.alfa(0.12f),
+                0f to Color.White.alfa(0.55f), 0.25f to Color.White.alfa(0.06f),
+                0.75f to Color.White.alfa(0.02f), 1f to Color.White.alfa(0.16f),
             )
             onDrawWithContent {
                 drawOutline(contorno, corpo)

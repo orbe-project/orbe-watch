@@ -315,6 +315,8 @@ class MiniCena(skinInicial: Skin) : Cena {
             figura.varredura = varredura
             figura.peso = peso
             figura.raioFixo = raio
+            // os cartões são redondos: a figura cabe no disco deles, não só no quadrado
+            figura.disco = if (raio > 0) -1.0 else min(w, h) / 2 - 2
             cor.copyInto(figura.cor)
             corFundo.copyInto(figura.corFundo)
             figura.avancar(d)
