@@ -5,7 +5,6 @@ import androidx.wear.compose.foundation.LocalSwipeToDismissBackgroundScrimColor
 import androidx.wear.compose.foundation.LocalSwipeToDismissContentScrimColor
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.pager.HorizontalPager
@@ -19,16 +18,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
-import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.wear.compose.foundation.lazy.rememberTransformingLazyColumnState
 import io.orbe.watch.Aparencia
@@ -36,6 +32,7 @@ import io.orbe.watch.OrbeViewModel
 import io.orbe.watch.dados.Ligacao
 import io.orbe.watch.gesto.Picos
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 
@@ -56,6 +53,8 @@ fun OrbeApp(
     editar: (Campo) -> Unit,
     /** o menu pedido pelo adb: "gaveta" ou o nome de uma aba; volta a null depois de abrir */
     menuPedido: MutableState<String?>,
+    /** o giro da coroa, da MainActivity (fora do foco do Compose) */
+    coroa: Flow<GiroCoroa>,
 ) {
     val aparencia by vm.aparencia.collectAsStateWithLifecycle()
     val ajustes by vm.ajustes.collectAsStateWithLifecycle()
@@ -70,9 +69,8 @@ fun OrbeApp(
     // a aba aberta no menu; null = a gaveta
     var aba by remember { mutableStateOf<Aba?>(null) }
     val escopo = rememberCoroutineScope()
-    val foco = remember { FocusRequester() }
     // a coroa no orbe: o giro cru vai para a lista dos orbes, que encaixa de orbe em orbe
-    val coroa = remember { MutableSharedFlow<GiroCoroa>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST) }
+    val coroaOrbe = remember { MutableSharedFlow<GiroCoroa>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST) }
     // a calibração da sacudida cobre o menu até salvar ou voltar
     var calibrando by remember { mutableStateOf<Calibracao?>(null) }
 
@@ -110,21 +108,7 @@ fun OrbeApp(
         }
         HorizontalPager(
             state = paginas,
-            modifier = Modifier
-                .fillMaxSize()
-                .onRotaryScrollEvent { e ->
-                    val d = e.verticalScrollPixels
-                    if (historico != null) {
-                        listaHistorico.dispatchRawDelta(d)
-                    } else if (paginas.currentPage == 0) {
-                        coroa.tryEmit(GiroCoroa(e.uptimeMillis, d, e.inputDeviceId))
-                    } else {
-                        if (aba != null) lista.dispatchRawDelta(d)
-                    }
-                    true
-                }
-                .focusRequester(foco)
-                .focusable(),
+            modifier = Modifier.fillMaxSize(),
             // as duas páginas ficam montadas: o menu pede as prévias das miniaturas
             // já na abertura, e não nasce no meio do arrasto
             beyondViewportPageCount = 1,
@@ -132,7 +116,7 @@ fun OrbeApp(
             userScrollEnabled = paginas.settledPage == 0,
         ) { pagina ->
             if (pagina == 0) {
-                TelaOrbe(vm, redonda, podeGravar, abrirAjustes = { escopo.launch { paginas.animateScrollToPage(1) } }, coroa = coroa)
+                TelaOrbe(vm, redonda, podeGravar, abrirAjustes = { escopo.launch { paginas.animateScrollToPage(1) } }, coroa = coroaOrbe)
             } else {
                 TelaAjustes(
                     vm, lista, aba,
@@ -198,13 +182,18 @@ fun OrbeApp(
     BackHandler(historico != null) { vm.fecharHistorico() }
     // cada abertura do histórico começa do alto
     LaunchedEffect(historico == null) { if (historico != null) listaHistorico.scrollToItem(0) }
-    // a coroa só chega a quem tem o foco: pedir de novo a cada volta ao app (a
-    // activity pausada é retomada, não recriada) e ao fechar o que cobre o orbe
-    LifecycleResumeEffect(Unit) {
-        foco.requestFocus()
-        onPauseOrDispose { }
+    // com o histórico aberto a coroa rola ele; no orbe passa de orbe em orbe; no menu rola a aba
+    val estado by rememberUpdatedState(Triple(historico != null, paginas.currentPage, aba))
+    LaunchedEffect(coroa) {
+        coroa.collect { g ->
+            val (comHistorico, pagina, abaAberta) = estado
+            when {
+                comHistorico -> listaHistorico.dispatchRawDelta(g.delta)
+                pagina == 0 -> coroaOrbe.tryEmit(g)
+                abaAberta != null -> lista.dispatchRawDelta(g.delta)
+            }
+        }
     }
-    LaunchedEffect(historico == null, calibrando, paginas.settledPage) { foco.requestFocus() }
     LaunchedEffect(menuPedido.value) {
         val m = menuPedido.value ?: return@LaunchedEffect
         menuPedido.value = null

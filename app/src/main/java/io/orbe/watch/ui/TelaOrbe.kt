@@ -202,8 +202,10 @@ fun TelaOrbe(
         // o encaixe do Wear: na coroa de alta resolução (TicWatch Pro 5, Pixel Watch)
         // o giro acumula e assenta no orbe mais perto; nos encoders de clique
         // (molduras giratórias) cada clique é um orbe. Giro rápido passa vários.
-        val encaixe = RotaryScrollableDefaults.snapBehavior(paginas)
-        LaunchedEffect(paginas, encaixe) {
+        // O efeito não reinicia com a recomposição: reiniciar cancelava o encaixe no
+        // meio e a lista ficava parada entre dois orbes.
+        val encaixe by rememberUpdatedState(RotaryScrollableDefaults.snapBehavior(paginas))
+        LaunchedEffect(paginas) {
             coroa.collect { g -> with(encaixe) { performScroll(g.t, g.delta, g.aparelho, Orientation.Vertical) } }
         }
         // assentou noutra skin pelo dedo: ela passa a ser o orbe do relógio
