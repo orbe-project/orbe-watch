@@ -413,7 +413,7 @@ private fun MenuEscopo.gestos(vm: OrbeViewModel, ajustes: Ajustes, pedirMicrofon
         Triple("O que não é batida", ajustes.batidaNada, Calibracao.NADA),
     ).map { (nome, guardado, tipo) ->
         @Composable {
-            val n = Janela.lista(guardado).size
+            val n = remember(guardado) { if (guardado.isEmpty()) 0 else guardado.count { it == '|' } + 1 }
             Linha(nome, subtitulo = if (n > 0) "$n exemplos" else "sem calibrar", aoClicar = { calibrar(tipo) })
         }
     })

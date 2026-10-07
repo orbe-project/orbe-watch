@@ -193,7 +193,7 @@ fun Etiqueta(texto: String, modifier: Modifier = Modifier) {
 /** A caixa de vidro de um grupo do app (Grupo.qml): cada linha do menu tem a sua. */
 @Composable
 fun Modifier.caixa(): Modifier {
-    return fillMaxWidth().vidro(RoundedCornerShape(16.dp))
+    return fillMaxWidth().vidro(RoundedCornerShape(12.dp))
 }
 
 /**

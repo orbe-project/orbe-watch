@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun Modifier.vidro(forma: Shape, tinta: Color? = null, apertado: Boolean = false): Modifier {
     val escala by animateFloatAsState(
-        if (apertado) 0.96f else 1f,
+        if (apertado) 0.975f else 1f,
         spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
         label = "vidro",
     )
@@ -55,10 +55,10 @@ fun Modifier.vidro(forma: Shape, tinta: Color? = null, apertado: Boolean = false
                 0f to Color.White.alfa(if (base != null) 0.16f else 0.035f), 0.35f to Color.Transparent,
             )
             // a espessura: escurece por dentro junto à borda de baixo
-            val fundo = Brush.verticalGradient(0.6f to Color.Transparent, 1f to Color.Black.alfa(0.28f))
+            val fundo = Brush.verticalGradient(0.6f to Color.Transparent, 1f to Color.Black.alfa(0.14f))
             // o fio da borda: aceso em cima, apagado no meio, um resto embaixo
             val borda = Brush.verticalGradient(
-                0f to Color.White.alfa(0.55f), 0.25f to Color.White.alfa(0.06f),
+                0f to Color.White.alfa(0.38f), 0.25f to Color.White.alfa(0.06f),
                 0.75f to Color.White.alfa(0.02f), 1f to Color.White.alfa(0.16f),
             )
             onDrawWithContent {

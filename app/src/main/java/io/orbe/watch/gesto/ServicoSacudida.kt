@@ -181,6 +181,8 @@ class ServicoSacudida : Service(), SensorEventListener {
     /** Abre a janela ou a estende por [ms]; uma janela aberta nunca encurta. */
     private fun abrirJanela(motivo: String, ms: Long = JANELA_MS) {
         val g = giro ?: return
+        // com o orbe na frente a sacudida é a do sair (MainActivity): ler aqui só gastava
+        if (orbeNaFrente) { fecharJanela(); return }
         if (!janelaAberta) {
             sacudida.zerar()
             avisouArmado = false
@@ -217,6 +219,7 @@ class ServicoSacudida : Service(), SensorEventListener {
                 sacudida.gravidade(gy, gz)
             }
             Sensor.TYPE_GYROSCOPE -> {
+                if (orbeNaFrente) { fecharJanela(); return }
                 val (x, y, z) = event.values
                 val gesto = sacudida.ler(event.timestamp / 1_000_000, x, sqrt(x * x + y * y + z * z))
                 if (sacudida.armado && !avisouArmado) {
