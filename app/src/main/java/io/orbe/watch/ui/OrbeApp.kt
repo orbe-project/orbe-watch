@@ -310,15 +310,13 @@ private fun BatidasNoPulso(
                     Sensor.TYPE_ACCELEROMETER -> {
                         batida.acel(event.timestamp / 1_000_000, x, y, z)
                         for (r in batida.tirarRegistros()) Log.i("OrbeBatida", r)
-                        // o aviso vibra já aqui, na linha dos sensores: postado na principal
-                        // (que engasga) ele caía a esmo, às vezes em cima da batida seguinte
-                        for (jn in batida.tirarJanelas()) {
-                            val forte = modelo.classificar(jn).first == Forca.FORTE
-                            Log.i("OrbeBatida", "aviso ${if (forte) "FORTE" else "FRACA"} vibrando")
-                            aviso[0](forte)
-                        }
+                        batida.tirarJanelas()
+                        // o aviso vibra uma vez, no comando, e já aqui na linha dos sensores:
+                        // a cada toque ele caía em cima do toque seguinte (o detector fica
+                        // surdo enquanto o motor vibra) e a sequência rápida se perdia
                         for (c in batida.tirarComandos()) {
                             Log.i("OrbeBatida", "comando ${c.forca} x${c.vezes}")
+                            aviso[0](c.forca == Forca.FORTE)
                             principal.post { acao[0](c) }
                         }
                     }

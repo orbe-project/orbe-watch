@@ -354,7 +354,7 @@ class Batida(
         private const val PRE_ESTALO_MS = 350L
         private const val RAIZ2 = 1.41421f
         const val MAX_VEZES = 4
-        const val JUNTAR_MS = 1250L              // os pares do Davi: 650 a 1150 ms (pico a pico)
+        const val JUNTAR_MS = 700L               // os toques rápidos do Davi: 300 a 450 ms (pico a pico)
 
         /** um número só para comparar a força de duas janelas */
         fun forca(j: Janela) = j.aceleracao + j.giro

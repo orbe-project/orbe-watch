@@ -970,8 +970,8 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /**
-     * O aviso de cada batida, na hora em que é detectada (o comando só sai depois
-     * da espera pelo segundo): um clique para a fraca, dois para o estalo.
+     * O aviso de um comando das batidas, na hora em que ele sai: um clique para
+     * os toques, dois para os que terminam em estalo.
      */
     fun avisarBatida(forte: Boolean) {
         // o motor de vibração balança o relógio: o detector fica surdo enquanto vibra
