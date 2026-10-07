@@ -51,7 +51,10 @@ data class Ajustes(
     val instancia: Int = 0,
     /** a última instância de cada orbe, pela skin: voltar a ele é voltar a ela */
     val instancias: Map<String, Int> = emptyMap(),
+    /** o glitch de cada orbe que ainda não tem o seu ([glitches]) */
     val glitch: Boolean = true,
+    /** o glitch de cada orbe, pela skin: cada um guarda o seu */
+    val glitches: Map<String, Boolean> = emptyMap(),
     /** as linhas de varredura (o tubo de TV), nas skins desenhadas */
     val linhas: Boolean = true,
     /** o fundo do menu (o papel de parede do PC borrado) também atrás dos orbes */
@@ -118,6 +121,9 @@ data class Ajustes(
     /** A escala do orbe da [skin]. */
     fun tamanhoDe(skin: Skin): Float = tamanhos[skin.id] ?: tamanho
 
+    /** O glitch do orbe da [skin]. */
+    fun glitchDe(skin: Skin): Boolean = glitches[skin.id] ?: glitch
+
     /** As skins na ordem da lista: as de [ordem] e, depois delas, as que faltarem, na ordem de sempre. */
     fun skins(): List<Skin> {
         val escolhidas = ordem.mapNotNull { id -> Skin.entries.firstOrNull { it.id == id } }.distinct()
@@ -129,7 +135,7 @@ data class Ajustes(
         t, agentes, voz, vozPc, microfone, vibrar, texto, glitch, linhas, tamanho, seguirPc, tamanhos,
         toques = toques.map { it.id }, segurar = segurar.map { it.id }, live = live, fundo = fundo, ordem = skins().map { it.id },
         sacudida = sacudida, sair = sair, sacudidaFora = sacudidaFora, sacudidaDentro = sacudidaDentro, sairFora = sairFora,
-        etapas = etapas, idiomaEtapas = idiomaEtapas,
+        etapas = etapas, idiomaEtapas = idiomaEtapas, glitches = glitches,
     )
 
     fun com(s: Sincronia) = copy(
@@ -137,6 +143,8 @@ data class Ajustes(
         texto = s.texto, glitch = s.glitch, linhas = s.linhas, tamanho = s.tamanho.coerceIn(TAMANHO_MIN, TAMANHO_MAX), seguirPc = s.seguirPc,
         // o PC manda null no orbe que ainda segue o tamanho comum
         tamanhos = s.tamanhos.mapNotNull { (k, v) -> v?.let { k to it.coerceIn(TAMANHO_MIN, TAMANHO_MAX) } }.toMap(),
+        // o PC manda null no orbe que segue o glitch comum; um PC antigo não manda o mapa
+        glitches = s.glitches?.mapNotNull { (k, v) -> v?.let { k to it } }?.toMap() ?: glitches,
         // o que o PC ainda não conhece (null) fica como está aqui
         toques = s.toques?.let { l -> lista(l, toques, AcaoToque.CURTAS) } ?: toques,
         segurar = s.segurar?.let { l -> lista(l, segurar, AcaoToque.entries) } ?: segurar,
@@ -179,6 +187,7 @@ class Cofre(private val ctx: Context) {
         val linhas = booleanPreferencesKey("linhas")
         val tamanho = floatPreferencesKey("tamanho")
         val tamanhos = stringPreferencesKey("tamanhos")    // "skin=1.0;skin=0.8"
+        val glitches = stringPreferencesKey("glitches")    // "skin=1;skin=0"
         val texto = booleanPreferencesKey("texto")
         val microfone = booleanPreferencesKey("microfone")
         val voz = booleanPreferencesKey("voz")
@@ -246,6 +255,10 @@ class Cofre(private val ctx: Context) {
             linhas = p[K.linhas] ?: d.linhas,
             tamanho = (p[K.tamanho] ?: d.tamanho).coerceIn(Ajustes.TAMANHO_MIN, Ajustes.TAMANHO_MAX),
             tamanhos = lerTamanhos(p[K.tamanhos]),
+            glitches = p[K.glitches].orEmpty().split(';').mapNotNull { par ->
+                val q = par.split('=', limit = 2)
+                q[0].takeIf { it.isNotEmpty() && q.size == 2 }?.let { it to (q[1] == "1") }
+            }.toMap(),
             texto = p[K.texto] ?: d.texto,
             microfone = p[K.microfone] ?: d.microfone,
             voz = p[K.voz] ?: d.voz,
@@ -282,6 +295,7 @@ class Cofre(private val ctx: Context) {
             p[K.linhas] = a.linhas
             p[K.tamanho] = a.tamanho
             p[K.tamanhos] = a.tamanhos.entries.joinToString(";") { "${it.key}=${it.value}" }
+            p[K.glitches] = a.glitches.entries.joinToString(";") { "${it.key}=${if (it.value) 1 else 0}" }
             p[K.texto] = a.texto
             p[K.microfone] = a.microfone
             p[K.voz] = a.voz

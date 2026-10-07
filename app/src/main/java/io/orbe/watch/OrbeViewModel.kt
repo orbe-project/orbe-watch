@@ -189,7 +189,7 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
         // sem o papel de parede não há vidro a pôr atrás do orbe: ele fica no preto
         val fundo = a.fundo && tema.papel.isNotEmpty()
         return if (a.seguirPc && pc != null) Aparencia(skin, pc.orbe.glitch, pc.orbe.glitch, tema, instancia, fundo)   // no PC as linhas vêm com o glitch
-        else Aparencia(skin, a.glitch, a.linhas, tema, instancia, fundo)
+        else Aparencia(skin, a.glitchDe(skin), a.linhas, tema, instancia, fundo)
     }
 
     /** Leva os ajustes para a cena (quem desenha lê dela). */
@@ -287,7 +287,11 @@ class OrbeViewModel(app: Application) : AndroidViewModel(app) {
     /** Escolher o avatar no relógio solta o orbe do PC: fica o que o relógio escolheu. */
     fun skin(s: Skin) = mudarSinc { it.copy(seguirPc = false, skin = s.id, instancia = it.instanciaDe(s), glitch = aparencia.value.glitch, linhas = aparencia.value.linhas) }
 
-    fun glitch(v: Boolean) = mudarSinc { it.copy(seguirPc = false, glitch = v, linhas = aparencia.value.linhas, skin = aparencia.value.skin.id) }
+    /** O glitch do orbe em tela: cada orbe guarda o seu. */
+    fun glitch(v: Boolean) = mudarSinc {
+        val sk = aparencia.value.skin
+        it.copy(seguirPc = false, glitches = it.glitches + (sk.id to v), linhas = aparencia.value.linhas, skin = sk.id)
+    }
 
     fun linhas(v: Boolean) = mudarSinc { it.copy(seguirPc = false, linhas = v, glitch = aparencia.value.glitch, skin = aparencia.value.skin.id) }
 
