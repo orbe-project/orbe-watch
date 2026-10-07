@@ -302,6 +302,10 @@ private fun BatidasNoPulso(
         if (!ligado) return@DisposableEffect onDispose { }
         val batida = Batida(modelo)
         val principal = Handler(Looper.getMainLooper())
+        // os sensores numa linha própria: na principal, cada engasgo do Compose
+        // segurava as leituras na fila e atrasava o reconhecimento
+        val linha = android.os.HandlerThread("batidas").apply { start() }
+        val naLinha = Handler(linha.looper)
         val sensores = ctx.getSystemService(SensorManager::class.java)
         val ouvinte = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
@@ -330,9 +334,9 @@ private fun BatidasNoPulso(
         val ciclo = LifecycleEventObserver { _, e ->
             when (e) {
                 Lifecycle.Event.ON_RESUME -> {
-                    batida.zerar()
-                    sensores?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let { sensores.registerListener(ouvinte, it, SensorManager.SENSOR_DELAY_FASTEST) }
-                    sensores?.getDefaultSensor(Sensor.TYPE_GYROSCOPE)?.let { sensores.registerListener(ouvinte, it, SensorManager.SENSOR_DELAY_FASTEST) }
+                    naLinha.post { batida.zerar() }
+                    sensores?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)?.let { sensores.registerListener(ouvinte, it, SensorManager.SENSOR_DELAY_FASTEST, naLinha) }
+                    sensores?.getDefaultSensor(Sensor.TYPE_GYROSCOPE)?.let { sensores.registerListener(ouvinte, it, SensorManager.SENSOR_DELAY_FASTEST, naLinha) }
                 }
                 Lifecycle.Event.ON_PAUSE -> sensores?.unregisterListener(ouvinte)
                 else -> Unit
@@ -342,6 +346,7 @@ private fun BatidasNoPulso(
         onDispose {
             dono.lifecycle.removeObserver(ciclo)
             sensores?.unregisterListener(ouvinte)
+            linha.quitSafely()
         }
     }
 }

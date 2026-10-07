@@ -30,8 +30,8 @@ data class Comando(val forca: Forca, val vezes: Int) {
     val indice get() = (if (forca == Forca.FORTE) 4 else 0) + vezes - 1
 }
 
-const val AMOSTRAS = 35                     // ~350 ms a 100 Hz
-const val ANTES = 8                 // amostras antes do pico na janela
+const val AMOSTRAS = 24                     // ~240 ms a 100 Hz: o toque cabe, e a janela fecha cedo
+const val ANTES = 6                 // amostras antes do pico na janela
 const val DIMENSAO = AMOSTRAS * 6
 
 /**
@@ -197,6 +197,7 @@ class Batida(
     private val lenta = FloatArray(6)
     private var temLenta = false
     private val giroAgora = FloatArray(3)
+    private val leitura = FloatArray(6)
     // as últimas leituras sem a parte lenta: 6 canais, num anel
     private val anel = Array(6) { FloatArray(ANEL) }
     private var n = 0L
@@ -227,7 +228,9 @@ class Batida(
 
     /** Uma leitura do acelerômetro (m/s²) no instante [ms]. */
     fun acel(ms: Long, x: Float, y: Float, z: Float) {
-        val v = floatArrayOf(x, y, z, giroAgora[0], giroAgora[1], giroAgora[2])
+        // a leitura no array de sempre: são 100 por segundo, sem alocar
+        val v = leitura
+        v[0] = x; v[1] = y; v[2] = z; v[3] = giroAgora[0]; v[4] = giroAgora[1]; v[5] = giroAgora[2]
         if (!temLenta) { v.copyInto(lenta); temLenta = true; return }
         val k = (n % ANEL).toInt()
         var ea = 0f
@@ -355,7 +358,7 @@ class Batida(
         private const val PRE_ESTALO_MS = 350L
         private const val RAIZ2 = 1.41421f
         const val MAX_VEZES = 4
-        const val JUNTAR_MS = 700L               // os toques rápidos do Davi: 300 a 450 ms (pico a pico)
+        const val JUNTAR_MS = 500L               // os toques rápidos do Davi: 300 a 450 ms (pico a pico)
 
         /** um número só para comparar a força de duas janelas */
         fun forca(j: Janela) = j.aceleracao + j.giro
