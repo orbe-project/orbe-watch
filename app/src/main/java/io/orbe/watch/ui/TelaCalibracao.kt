@@ -63,24 +63,29 @@ fun TelaCalibracao(
     padrao: () -> Unit,
 ) {
     val tentativas = remember { mutableStateListOf<Picos>() }
+    val tracos = remember { mutableStateListOf<FloatArray>() }
+    val traco = remember { TracoGiro() }
     val sacudida = remember { Sacudida() }
-    Sensores(sacudida) {
+    Sensores(sacudida) { ms, x ->
+        traco.ler(ms, x)
         val par = sacudida.tirarPar() ?: return@Sensores
         // um ajeitar do pulso entre as tentativas não é sacudida
         if (par.dentro < TENTATIVA_MIN || tentativas.size >= TENTATIVAS) return@Sensores
         tentativas += par
+        traco.recorte()?.let { tracos += it }
         // cada tentativa recomeça com a espera parada, como ao acender a tela
         sacudida.zerar()
     }
     val proposta = if (tentativas.size >= TENTATIVAS) limiares(tentativas) else null
-    Moldura(
-        "Calibrar o abrir", redonda,
-        aviso = if (proposta != null) "Fora ${um(proposta.fora)} · dentro ${um(proposta.dentro)} rad/s"
-        else "Pulso parado, depois uma sacudida para fora e de volta. Tentativa ${tentativas.size + 1} de $TENTATIVAS.",
-        tentativas = tentativas.map { "fora ${um(it.fora)} · dentro ${um(it.dentro)}" },
-        padrao = "fora ${um(Sacudida.FORA_MIN)} · dentro ${um(Sacudida.DENTRO_MIN)}", aoPadrao = padrao,
-        pronta = proposta != null, refazer = { tentativas.clear() }, salvar = { proposta?.let(salvar) },
-        emUso = "fora ${um(emUso.fora)} · dentro ${um(emUso.dentro)}",
+    val lim = proposta ?: emUso
+    MolduraRedonda(
+        "abrir",
+        dica = if (proposta != null) "fora ${um(proposta.fora)} · dentro ${um(proposta.dentro)} rad/s"
+        else "pulso parado, sacuda para fora e de volta",
+        amostras = Amostras(tentativas.size, TENTATIVAS, TENTATIVAS),
+        grafico = { m -> GraficoSacudida(tracos.toList(), lim.fora, lim.dentro, "lim ${um(lim.fora)} · ${um(lim.dentro)}", m) },
+        mostrarPadrao = tentativas.isEmpty(), aoPadrao = padrao,
+        pronta = proposta != null, refazer = { tentativas.clear(); tracos.clear() }, salvar = { proposta?.let(salvar) },
     )
 }
 
@@ -98,21 +103,25 @@ fun TelaCalibracaoSair(
     padrao: () -> Unit,
 ) {
     val foras = remember { mutableStateListOf<Float>() }
+    val tracos = remember { mutableStateListOf<FloatArray>() }
+    val traco = remember { TracoGiro() }
     val sacudida = remember { Sacudida(paradoMs = Sacudida.PARADO_MS) }
-    Sensores(sacudida) {
+    Sensores(sacudida) { ms, x ->
+        traco.ler(ms, x)
         val fora = sacudida.tirarFora() ?: return@Sensores
         if (fora < TENTATIVA_MIN || foras.size >= TENTATIVAS) return@Sensores
         foras += fora
+        traco.recorte()?.let { tracos += it }
     }
     val proposta = if (foras.size >= TENTATIVAS) limiarSair(foras) else null
-    Moldura(
-        "Calibrar o sair", redonda,
-        aviso = if (proposta != null) "Fora ${um(proposta)} rad/s"
-        else "Pulso parado, depois uma sacudida só para fora. Tentativa ${foras.size + 1} de $TENTATIVAS.",
-        tentativas = foras.map { "fora ${um(it)}" },
-        padrao = "fora ${um(Sacudida.FORA_MIN)}", aoPadrao = padrao,
-        pronta = proposta != null, refazer = { foras.clear() }, salvar = { proposta?.let(salvar) },
-        emUso = if (emUso > 0f) "fora ${um(emUso)}" else "o padrão, fora ${um(Sacudida.FORA_MIN)}",
+    val lim = proposta ?: emUso.takeIf { it > 0f } ?: Sacudida.FORA_MIN
+    MolduraRedonda(
+        "sair",
+        dica = if (proposta != null) "fora ${um(proposta)} rad/s" else "pulso parado, sacuda só para fora",
+        amostras = Amostras(foras.size, TENTATIVAS, TENTATIVAS),
+        grafico = { m -> GraficoSacudida(tracos.toList(), lim, null, "lim ${um(lim)}", m) },
+        mostrarPadrao = foras.isEmpty(), aoPadrao = padrao,
+        pronta = proposta != null, refazer = { foras.clear(); tracos.clear() }, salvar = { proposta?.let(salvar) },
     )
 }
 
@@ -250,67 +259,12 @@ private fun MolduraRedonda(
     }
 }
 
-/** A tela das calibrações, sobre o mesmo fundo do menu. */
-@Composable
-private fun Moldura(
-    titulo: String,
-    redonda: Boolean,
-    aviso: String,
-    tentativas: List<String>,
-    padrao: String,
-    aoPadrao: () -> Unit,
-    pronta: Boolean,
-    refazer: () -> Unit,
-    salvar: () -> Unit,
-    emUso: String,
-    grafico: (@Composable () -> Unit)? = null,
-    amostras: Amostras? = null,
-) {
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        FundoVidro()
-        // as barras das amostras na borda, paradas enquanto o resto rola
-        amostras?.let { AnelAmostras(it, Modifier.fillMaxSize()) }
-        val margem = maxWidth * (if (redonda) 0.14f else 0.05f)
-        Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = margem),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Vao(if (redonda) 30.dp else 12.dp)
-            Texto(titulo, Estilo.grupo, alinhar = TextAlign.Center)
-            Vao(8.dp)
-            Texto(aviso, Estilo.subtitulo, alinhar = TextAlign.Center)
-            Vao(10.dp)
-            if (grafico != null) {
-                grafico()
-                Vao(8.dp)
-            }
-            Column(Modifier.caixa()) {
-                tentativas.forEachIndexed { i, t ->
-                    Linha("Tentativa ${i + 1}", subtitulo = t)
-                    Box(Modifier.fillMaxWidth().height(1.dp).background(Estilo.texto.alfa(0.08f)))
-                }
-                Linha("Padrão", subtitulo = padrao, aoClicar = aoPadrao)
-            }
-            if (pronta) {
-                Vao(10.dp)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Botao("Refazer", Modifier.weight(1f), aoClicar = refazer)
-                    Botao("Salvar", Modifier.weight(1f), destaque = true, aoClicar = salvar)
-                }
-            }
-            Vao(8.dp)
-            Texto("Em uso: $emUso", Estilo.mono, cor = Estilo.texto.alfa(0.6f), alinhar = TextAlign.Center)
-            Vao(if (redonda) 40.dp else 16.dp)
-        }
-    }
-}
-
 /**
  * Liga acelerômetro e giroscópio à [sacudida] enquanto a tela está aberta;
  * [aoLer] roda depois de cada leitura do giroscópio, para tirar o que ela mediu.
  */
 @Composable
-private fun Sensores(sacudida: Sacudida, aoLer: () -> Unit) {
+private fun Sensores(sacudida: Sacudida, aoLer: (ms: Long, omegaX: Float) -> Unit) {
     val ctx = LocalContext.current
     val ler = remember { arrayOf(aoLer) }
     ler[0] = aoLer
@@ -331,7 +285,7 @@ private fun Sensores(sacudida: Sacudida, aoLer: () -> Unit) {
                         val (x, y, z) = event.values
                         sacudida.ler(event.timestamp / 1_000_000, x, sqrt(x * x + y * y + z * z))
                         sacudida.tirarResumo()?.let { Log.i("OrbeGesto", "calibração: $it") }
-                        ler[0]()
+                        ler[0](event.timestamp / 1_000_000, x)
                     }
                 }
             }
