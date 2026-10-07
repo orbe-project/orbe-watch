@@ -58,12 +58,6 @@ class Janela(val forma: FloatArray, val aceleracao: Float, val giro: Float) {
     }
 }
 
-private fun dot(a: FloatArray, b: FloatArray): Float {
-    var s = 0f
-    for (i in a.indices) s += a[i] * b[i]
-    return s
-}
-
 /**
  * A semelhança de duas formas com folga de alinhamento: o maior produto com uma
  * delas deslocada até [FOLGA] amostras (o pico de um toque cai uma ou duas
@@ -88,37 +82,44 @@ private fun parecidas(a: FloatArray, b: FloatArray): Float {
 private const val FOLGA = 3
 
 /**
- * O perfil aprendido de uma força: a forma média das tentativas, o limiar de
- * semelhança (a menos parecida delas com a média, com folga) e a faixa da força
- * (média e desvio do logaritmo dos picos).
+ * O perfil aprendido de uma força: as próprias tentativas como exemplos (a
+ * semelhança de um gesto é a do exemplo mais parecido, então cada posição do
+ * braço calibrada vale por si, sem virar uma média que não parece com nenhuma),
+ * o limiar de semelhança (quanto cada exemplo se parece com o vizinho mais
+ * próximo entre os outros, com folga) e a faixa da força (do mais fraco ao mais
+ * forte das tentativas, com folga).
  */
-class Perfil(val forma: FloatArray, val limiar: Float, val mA: Float, val sA: Float, val mG: Float, val sG: Float) {
-    fun parecenca(j: Janela) = parecidas(j.forma, forma)
+class Perfil(
+    private val exemplos: List<FloatArray>,
+    val limiar: Float,
+    private val aceleracao: ClosedFloatingPointRange<Float>,
+    private val giro: ClosedFloatingPointRange<Float>,
+) {
+    fun parecenca(j: Janela) = exemplos.maxOf { parecidas(j.forma, it) }
 
-    /** a força da janela na faixa das tentativas (com folga para a calibração ser curta) */
-    fun naFaixa(j: Janela): Boolean {
-        val zA = (ln(max(j.aceleracao, 1e-3f)) - mA) / max(sA, 0.25f)
-        val zG = (ln(max(j.giro, 1e-3f)) - mG) / max(sG, 0.35f)
-        return abs(zA) <= 3f && abs(zG) <= 3.5f
-    }
+    /** a força da janela na faixa das tentativas, com folga para os lados */
+    fun naFaixa(j: Janela) = j.aceleracao in aceleracao && j.giro in giro
 
     companion object {
+        private const val FOLGA_FORCA = 2f
+
         fun de(tentativas: List<Janela>): Perfil? {
             if (tentativas.size < 3) return null
-            val m = FloatArray(DIMENSAO)
-            for (t in tentativas) for (i in m.indices) m[i] += t.forma[i]
-            val n = sqrt(dot(m, m)).coerceAtLeast(1e-6f)
-            for (i in m.indices) m[i] /= n
-            val limiar = (tentativas.minOf { parecidas(it.forma, m) } - 0.08f).coerceIn(0.35f, 0.9f)
-            val la = tentativas.map { ln(max(it.aceleracao, 1e-3f)) }
-            val lg = tentativas.map { ln(max(it.giro, 1e-3f)) }
-            return Perfil(m, limiar, media(la), desvio(la), media(lg), desvio(lg))
-        }
-
-        private fun media(l: List<Float>) = l.sum() / l.size
-        private fun desvio(l: List<Float>): Float {
-            val mm = media(l)
-            return sqrt(l.sumOf { ((it - mm) * (it - mm)).toDouble() }.toFloat() / l.size)
+            val formas = tentativas.map { it.forma }
+            // cada exemplo contra o mais parecido dos outros; o pior (o segundo pior
+            // com bastante exemplo, para um só esquisito não afrouxar tudo) dá o limiar
+            val vizinhos = formas.indices.map { a ->
+                formas.indices.filter { it != a }.maxOf { b -> parecidas(formas[a], formas[b]) }
+            }.sorted()
+            val base = if (vizinhos.size >= 8) vizinhos[1] else vizinhos[0]
+            val limiar = (base - 0.08f).coerceIn(0.35f, 0.9f)
+            val a = tentativas.map { it.aceleracao }
+            val g = tentativas.map { it.giro }
+            return Perfil(
+                formas, limiar,
+                a.min() / FOLGA_FORCA..a.max() * FOLGA_FORCA,
+                g.min() / FOLGA_FORCA..g.max() * FOLGA_FORCA,
+            )
         }
     }
 }

@@ -171,8 +171,8 @@ fun TelaCalibracaoBatida(
         nada && !pronta -> "Digite, toque a tela, mexa o braço como sempre. Gravando: $restante s."
         nada -> "${janelas.size} movimentos guardados para recusar."
         pronta -> "Pronto: ${janelas.size} tentativas."
-        tipo == Calibracao.FRACA -> "Braço erguido, um toque do dedo médio no dedão. Tentativa ${janelas.size + 1} de $TENTATIVAS_BATIDA."
-        else -> "Braço erguido, um estalo. Tentativa ${janelas.size + 1} de $TENTATIVAS_BATIDA."
+        tipo == Calibracao.FRACA -> "Um toque do dedo médio no dedão. ${posicao(janelas.size)} Tentativa ${janelas.size + 1} de $TENTATIVAS_BATIDA."
+        else -> "Um estalo. ${posicao(janelas.size)} Tentativa ${janelas.size + 1} de $TENTATIVAS_BATIDA."
     }
     Moldura(
         titulo, redonda,
@@ -316,7 +316,15 @@ private fun SensoresBatida(batida: Batida, aoLer: () -> Unit) {
 private fun um(v: Float) = "%.1f".format(v).replace('.', ',')
 
 private const val TENTATIVAS = 3
-private const val TENTATIVAS_BATIDA = 8
+private const val TENTATIVAS_BATIDA = 20
+
+/** A posição do braço pedida a cada cinco tentativas: o perfil guarda os exemplos de todas. */
+private fun posicao(feitas: Int) = when (feitas / 5) {
+    0 -> "Braço erguido, tela para você."
+    1 -> "Braço na horizontal, à frente."
+    2 -> "Braço solto, ao lado do corpo."
+    else -> "Pulso virado, tela para cima ou de lado."
+}
 private const val SEGUNDOS_NADA = 15
 private const val NADA_MAX = 24
 private const val ALFA_GRAVIDADE = 0.2f
